@@ -21,7 +21,7 @@ Follow these steps to get the application running locally.
 
 1.  **Clone the repository:**
     ```bash
-    git clone <your-repository-url>
+    git clone https://github.com/anshnen/Portfolio_Backend
     cd portfolio-api
     ```
 
