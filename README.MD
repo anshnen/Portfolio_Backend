@@ -110,15 +110,14 @@ You can test the API endpoints using a tool like Postman, Insomnia, or `curl` fr
 
 1.  **Get Portfolio Summary:**
     Open a new terminal and run the following command to fetch the summary for portfolio with ID `1`.
-    ```bash
-    curl [http://127.0.0.1:5000/api/v1/portfolio/1/summary](http://127.0.0.1:5000/api/v1/portfolio/1/summary)
+    ```
+http://127.0.0.1:5000/api/v1/portfolio/1/summary
     ```
     You should see a detailed JSON response with net worth, cash flow, accounts, etc.
 
 2.  **Get All Accounts:**
     Run the following command to get a list of all accounts created by the seed script.
-    ```bash
-    curl [http://127.0.0.1:5000/api/v1/portfolio/accounts](http://127.0.0.1:5000/api/v1/portfolio/accounts)
+    ```http://127.0.0.1:5000/api/v1/portfolio/accounts
     ```
     You should see a JSON array of account objects.
 
