@@ -1,0 +1,9 @@
+Flask
+Flask-SQLAlchemy
+Flask-Migrate
+PyMySQL
+python-dotenv
+requests
+Flask-Cors
+yfinance
+Flask-Swagger-UI

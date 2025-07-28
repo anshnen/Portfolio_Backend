@@ -1,0 +1,79 @@
+-- schema.sql
+CREATE DATABASE portfolio_db;
+
+-- DROP TABLE IF EXISTS transactions;
+-- DROP TABLE IF EXISTS holdings;
+-- DROP TABLE IF EXISTS accounts;
+-- DROP TABLE IF EXISTS assets;
+-- DROP TABLE IF EXISTS portfolios;
+
+-- -- A user can have one portfolio (for this single-user app)
+-- CREATE TABLE portfolios (
+--     id INT AUTO_INCREMENT PRIMARY KEY,
+--     name VARCHAR(255) NOT NULL,
+--     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+--     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+-- );
+
+-- -- Master table for all tradable assets (stocks, bonds, ETFs, etc.)
+-- CREATE TABLE assets (
+--     id INT AUTO_INCREMENT PRIMARY KEY,
+--     ticker_symbol VARCHAR(20) UNIQUE NOT NULL,
+--     name VARCHAR(255) NOT NULL,
+--     asset_type ENUM('STOCK', 'BOND', 'ETF', 'MUTUAL_FUND', 'CRYPTO', 'CASH') NOT NULL,
+--     region VARCHAR(100), -- For insights like 'International Stocks'
+--     last_price DECIMAL(19, 4),
+--     previous_close_price DECIMAL(19, 4),
+--     price_updated_at TIMESTAMP,
+--     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+--     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+-- );
+-- CREATE INDEX idx_asset_ticker ON assets(ticker_symbol);
+
+-- -- Represents a financial account, e.g., Checking, Brokerage, IRA
+-- CREATE TABLE accounts (
+--     id INT AUTO_INCREMENT PRIMARY KEY,
+--     portfolio_id INT NOT NULL,
+--     name VARCHAR(255) NOT NULL,
+--     institution VARCHAR(255),
+--     account_type ENUM('CASH', 'INVESTMENT', 'RETIREMENT') NOT NULL,
+--     balance DECIMAL(19, 4) NOT NULL DEFAULT 0.00,
+--     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+--     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+--     FOREIGN KEY (portfolio_id) REFERENCES portfolios(id) ON DELETE CASCADE
+-- );
+-- CREATE INDEX idx_account_portfolio ON accounts(portfolio_id);
+
+-- -- Joins Accounts and Assets, representing ownership of a specific asset in an account
+-- CREATE TABLE holdings (
+--     id INT AUTO_INCREMENT PRIMARY KEY,
+--     account_id INT NOT NULL,
+--     asset_id INT NOT NULL,
+--     quantity DECIMAL(19, 8) NOT NULL, -- Using high precision for shares
+--     cost_basis DECIMAL(19, 4) NOT NULL,
+--     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+--     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+--     FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
+--     FOREIGN KEY (asset_id) REFERENCES assets(id) ON DELETE RESTRICT, -- Don't delete an asset if it's being held
+--     UNIQUE KEY (account_id, asset_id) -- An account can only have one holding record per asset
+-- );
+-- CREATE INDEX idx_holding_account ON holdings(account_id);
+-- CREATE INDEX idx_holding_asset ON holdings(asset_id);
+
+-- -- Immutable ledger of all financial events
+-- CREATE TABLE transactions (
+--     id INT AUTO_INCREMENT PRIMARY KEY,
+--     account_id INT NOT NULL,
+--     asset_id INT, -- Can be NULL for cash-only transactions like salary deposit
+--     transaction_type ENUM('BUY', 'SELL', 'DEPOSIT', 'WITHDRAWAL', 'DIVIDEND', 'INTEREST', 'FEE') NOT NULL,
+--     transaction_date DATE NOT NULL,
+--     quantity DECIMAL(19, 8), -- e.g., number of shares
+--     price_per_unit DECIMAL(19, 4), -- price per share at time of transaction
+--     total_amount DECIMAL(19, 4) NOT NULL, -- Net effect on cash balance
+--     description VARCHAR(255),
+--     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+--     FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
+--     FOREIGN KEY (asset_id) REFERENCES assets(id) ON DELETE SET NULL
+-- );
+-- CREATE INDEX idx_transaction_account ON transactions(account_id);
+-- CREATE INDEX idx_transaction_date ON transactions(transaction_date);

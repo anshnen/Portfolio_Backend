@@ -1,0 +1,173 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+      "title": "Portfolio Management API",
+      "description": "API for managing a financial portfolio, including accounts, holdings, and transactions.",
+      "version": "1.0.0"
+    },
+    "servers": [
+      {
+        "url": "/api/v1"
+      }
+    ],
+    "paths": {
+      "/portfolio/{portfolio_id}/summary": {
+        "get": {
+          "summary": "Get Portfolio Summary",
+          "description": "Retrieves a full summary of a portfolio, including net worth, cash flow, and a breakdown of accounts and holdings. This is the main endpoint for the dashboard.",
+          "parameters": [
+            {
+              "name": "portfolio_id",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "integer",
+                "example": 1
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "A successful response with the portfolio summary.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/PortfolioSummary"
+                  }
+                }
+              }
+            },
+            "404": {
+              "description": "Portfolio not found"
+            }
+          }
+        }
+      },
+      "/transactions": {
+        "post": {
+          "summary": "Add a Transaction",
+          "description": "Adds a new financial transaction and updates relevant account balances and holdings.",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NewTransaction"
+                }
+              }
+            }
+          },
+          "responses": {
+            "201": {
+              "description": "Transaction created successfully"
+            },
+            "400": {
+              "description": "Invalid input or insufficient funds/shares"
+            }
+          }
+        }
+      },
+      "/accounts": {
+        "get": {
+          "summary": "Get All Accounts",
+          "description": "Retrieves a list of all financial accounts in the portfolio.",
+          "responses": {
+            "200": {
+              "description": "A list of accounts.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/Account"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "post": {
+          "summary": "Add a New Account",
+          "description": "Creates a new financial account.",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NewAccount"
+                }
+              }
+            }
+          },
+          "responses": {
+            "201": {
+              "description": "Account created successfully"
+            },
+            "400": {
+              "description": "Missing required fields"
+            }
+          }
+        }
+      }
+    },
+    "components": {
+      "schemas": {
+        "Account": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "integer" },
+            "name": { "type": "string" },
+            "account_type": { "type": "string", "enum": ["CASH", "INVESTMENT", "RETIREMENT"] },
+            "institution": { "type": "string" },
+            "balance": { "type": "number", "format": "float" }
+          }
+        },
+        "NewAccount": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string", "example": "Chase Checking" },
+            "account_type": { "type": "string", "enum": ["CASH", "INVESTMENT", "RETIREMENT"] },
+            "institution": { "type": "string", "example": "Chase Bank" },
+            "balance": { "type": "number", "format": "float", "example": 5000.50 }
+          },
+          "required": ["name", "account_type", "balance"]
+        },
+        "NewTransaction": {
+          "type": "object",
+          "properties": {
+            "account_id": { "type": "integer", "example": 1 },
+            "transaction_type": { "type": "string", "enum": ["BUY", "SELL", "DEPOSIT", "WITHDRAWAL", "DIVIDEND", "INTEREST", "FEE"] },
+            "total_amount": { "type": "number", "format": "float", "description": "Net cash effect. Negative for BUY, WITHDRAWAL, FEE.", "example": -2500.00 },
+            "transaction_date": { "type": "string", "format": "date", "example": "2024-10-26" },
+            "asset_ticker": { "type": "string", "description": "Required for BUY/SELL transactions.", "example": "AAPL" },
+            "quantity": { "type": "number", "format": "float", "description": "Required for BUY/SELL transactions.", "example": 10 },
+            "price_per_unit": { "type": "number", "format": "float", "description": "Required for BUY/SELL transactions.", "example": 250.00 }
+          },
+          "required": ["account_id", "transaction_type", "total_amount", "transaction_date"]
+        },
+        "PortfolioSummary": {
+          "type": "object",
+          "properties": {
+            "net_worth": { "type": "number", "format": "float" },
+            "todays_change_amount": { "type": "number", "format": "float" },
+            "todays_change_percent": { "type": "number", "format": "float" },
+            "cash_flow": {
+              "type": "object",
+              "properties": {
+                "income": { "type": "number", "format": "float" },
+                "spending": { "type": "number", "format": "float" }
+              }
+            },
+            "accounts": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/Account"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  
