@@ -67,6 +67,45 @@
           }
         }
       },
+      "/transactions/{transaction_id}": {
+  "put": {
+    "summary": "Update a Transaction",
+    "description": "Updates an existing transaction and adjusts related holdings and account balances if applicable.",
+    "parameters": [
+      {
+        "name": "transaction_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "integer",
+          "example": 12
+        }
+      }
+    ],
+    "requestBody": {
+      "required": true,
+      "content": {
+        "application/json": {
+          "schema": {
+            "$ref": "#/components/schemas/UpdateTransaction"
+          }
+        }
+      }
+    },
+    "responses": {
+      "200": {
+        "description": "Transaction updated successfully"
+      },
+      "400": {
+        "description": "Invalid input or business rule violation"
+      },
+      "404": {
+        "description": "Transaction not found"
+      }
+    }
+  }
+}
+,
       "/portfolio/accounts": {
         "get": {
           "summary": "Get All Accounts",
@@ -133,6 +172,46 @@
           },
           "required": ["name", "account_type", "balance"]
         },
+        "UpdateTransaction": {
+  "type": "object",
+  "description": "Payload for updating an existing transaction.",
+  "properties": {
+    "transaction_type": {
+      "type": "string",
+      "enum": ["BUY", "SELL", "DEPOSIT", "WITHDRAWAL", "DIVIDEND", "INTEREST", "FEE"]
+    },
+    "total_amount": {
+      "type": "number",
+      "format": "float",
+      "example": 1500.00
+    },
+    "transaction_date": {
+      "type": "string",
+      "format": "date",
+      "example": "2024-12-01"
+    },
+    "description": {
+      "type": "string",
+      "example": "Updated notes"
+    },
+    "asset_ticker": {
+      "type": "string",
+      "example": "AAPL"
+    },
+    "quantity": {
+      "type": "number",
+      "format": "float",
+      "example": 5
+    },
+    "price_per_unit": {
+      "type": "number",
+      "format": "float",
+      "example": 300.00
+    }
+  },
+  "required": []
+}
+,
         "NewTransaction": {
           "type": "object",
           "properties": {
