@@ -7,7 +7,7 @@
     },
     "servers": [
       {
-        "url": "/api/v1"
+        "url": "/api/v1/"
       }
     ],
     "paths": {
@@ -67,7 +67,7 @@
           }
         }
       },
-      "/accounts": {
+      "/portfolio/accounts": {
         "get": {
           "summary": "Get All Accounts",
           "description": "Retrieves a list of all financial accounts in the portfolio.",
