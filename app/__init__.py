@@ -27,9 +27,11 @@ def create_app(config_name='default'):
 
     from .api.portfolio_routes import portfolio_bp
     from .api.transaction_routes import transaction_bp
+    from .api.market_data_routes import market_data_bp
     
     app.register_blueprint(portfolio_bp, url_prefix='/api/v1/portfolio')
     app.register_blueprint(transaction_bp, url_prefix='/api/v1/transactions')
+    app.register_blueprint(market_data_bp, url_prefix='/api/v1/market-data')
 
     SWAGGER_URL = '/api/docs'
     API_URL = '/static/swagger.json'
