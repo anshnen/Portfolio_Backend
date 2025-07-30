@@ -1,5 +1,5 @@
 from app import create_app
-from app.models.models import db, Portfolio, Account, Asset, Holding, Transaction
+from app.models.models import db, Portfolio, Account, Asset, Holding, Transaction, Watchlist, WatchlistItem
 from datetime import date, timedelta
 from decimal import Decimal
 
@@ -70,6 +70,37 @@ def run_seed():
         db.session.add_all(transactions)
         db.session.commit()
         print(f"Created {len(transactions)} transactions.")
+        
+        print("Creating watchlists...")
+        watchlist1 = Watchlist(name="Tech Giants", portfolio_id=portfolio.id)
+        watchlist2 = Watchlist(name="Dividend Stocks", portfolio_id=portfolio.id)
+        watchlist3 = Watchlist(name="Growth & EV", portfolio_id=portfolio.id)
+        db.session.add_all([watchlist1, watchlist2, watchlist3])
+        db.session.commit() # Commit to get watchlist IDs
+
+        watchlist_items = [
+            # Tech Giants
+            WatchlistItem(watchlist_id=watchlist1.id, asset_id=assets['AAPL'].id),
+            WatchlistItem(watchlist_id=watchlist1.id, asset_id=assets['MSFT'].id),
+            WatchlistItem(watchlist_id=watchlist1.id, asset_id=assets['GOOGL'].id),
+            WatchlistItem(watchlist_id=watchlist1.id, asset_id=assets['AMZN'].id),
+            WatchlistItem(watchlist_id=watchlist1.id, asset_id=assets['NVDA'].id),
+            WatchlistItem(watchlist_id=watchlist1.id, asset_id=assets['V'].id),
+            # Dividend Stocks
+            WatchlistItem(watchlist_id=watchlist2.id, asset_id=assets['JNJ'].id),
+            WatchlistItem(watchlist_id=watchlist2.id, asset_id=assets['JPM'].id),
+            WatchlistItem(watchlist_id=watchlist2.id, asset_id=assets['PG'].id),
+            WatchlistItem(watchlist_id=watchlist2.id, asset_id=assets['MSFT'].id),
+            # Growth & EV
+            WatchlistItem(watchlist_id=watchlist3.id, asset_id=assets['TSLA'].id),
+            WatchlistItem(watchlist_id=watchlist3.id, asset_id=assets['NVDA'].id),
+            WatchlistItem(watchlist_id=watchlist3.id, asset_id=assets['AMZN'].id)
+        ]
+        db.session.add_all(watchlist_items)
+        db.session.commit()
+        print(f"Created 3 watchlists with {len(watchlist_items)} items.")
+
+        print("\nDatabase seeded successfully! Run 'python update_prices.py' to fetch initial market data.")
 
         print("\nDatabase seeded successfully!")
 

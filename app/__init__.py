@@ -23,15 +23,17 @@ def create_app(config_name='default'):
 
     db.init_app(app)
     migrate.init_app(app, db)
-    CORS(app) # Enable Cross-Origin Resource Sharing
+    CORS(app) 
 
     from .api.portfolio_routes import portfolio_bp
     from .api.transaction_routes import transaction_bp
     from .api.market_data_routes import market_data_bp
+    from .api.watchlist_routes import watchlist_bp
     
     app.register_blueprint(portfolio_bp, url_prefix='/api/v1/portfolio')
     app.register_blueprint(transaction_bp, url_prefix='/api/v1/transactions')
     app.register_blueprint(market_data_bp, url_prefix='/api/v1/market-data')
+    app.register_blueprint(watchlist_bp, url_prefix='/api/v1/watchlists')
 
     SWAGGER_URL = '/api/docs'
     API_URL = '/static/swagger.json'

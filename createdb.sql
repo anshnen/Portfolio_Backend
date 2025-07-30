@@ -77,3 +77,27 @@ CREATE DATABASE portfolio_db;
 -- );
 -- CREATE INDEX idx_transaction_account ON transactions(account_id);
 -- CREATE INDEX idx_transaction_date ON transactions(transaction_date);
+
+
+-- -- Table to store the watchlist containers
+-- CREATE TABLE watchlists (
+--     id INT AUTO_INCREMENT PRIMARY KEY,
+--     name VARCHAR(100) NOT NULL,
+--     portfolio_id INT NOT NULL,
+--     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+--     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+--     FOREIGN KEY (portfolio_id) REFERENCES portfolios(id) ON DELETE CASCADE,
+--     UNIQUE KEY (portfolio_id, name) -- A user can't have two watchlists with the same name
+-- );
+
+-- -- Table to store the items within each watchlist
+-- -- This acts as a many-to-many join table between watchlists and assets
+-- CREATE TABLE watchlist_items (
+--     id INT AUTO_INCREMENT PRIMARY KEY,
+--     watchlist_id INT NOT NULL,
+--     asset_id INT NOT NULL,
+--     added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+--     FOREIGN KEY (watchlist_id) REFERENCES watchlists(id) ON DELETE CASCADE,
+--     FOREIGN KEY (asset_id) REFERENCES assets(id) ON DELETE CASCADE,
+--     UNIQUE KEY (watchlist_id, asset_id) -- An asset can only appear once in a given watchlist
+-- );

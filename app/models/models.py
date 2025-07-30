@@ -71,3 +71,21 @@ class Transaction(db.Model):
 
     account = db.relationship('Account', back_populates='transactions')
     asset = db.relationship('Asset', backref=backref('transactions', lazy=True))
+    
+class Watchlist(db.Model):
+    __tablename__ = 'watchlists'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    portfolio_id = db.Column(db.Integer, db.ForeignKey('portfolio.id'), nullable=False)
+    
+    portfolio = db.relationship('Portfolio', back_populates='watchlists')
+    items = db.relationship('WatchlistItem', back_populates='watchlist', cascade="all, delete-orphan")
+
+class WatchlistItem(db.Model):
+    __tablename__ = 'watchlist_items'
+    id = db.Column(db.Integer, primary_key=True)
+    watchlist_id = db.Column(db.Integer, db.ForeignKey('watchlists.id'), nullable=False)
+    asset_id = db.Column(db.Integer, db.ForeignKey('asset.id'), nullable=False)
+
+    watchlist = db.relationship('Watchlist', back_populates='items')
+    asset = db.relationship('Asset', back_populates='watchlist_items')
