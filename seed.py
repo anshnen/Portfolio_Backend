@@ -1,3 +1,5 @@
+# seed.py
+
 from app import create_app
 from app.models.models import db, Portfolio, Account, Asset, Holding, Transaction, Watchlist, WatchlistItem
 from datetime import date, timedelta
@@ -6,29 +8,29 @@ from decimal import Decimal
 def run_seed():
     """
     Populates the database with a realistic and consistent dataset for development and testing.
-    This script is idempotent - it clears old data before adding new data.
+    This script is now truly idempotent - it drops and recreates the entire schema
+    to ensure a clean state with predictable IDs every time.
     """
     app = create_app(config_name='development')
     with app.app_context():
         print("Starting database seed...")
 
-        # --- 1. Clear Existing Data (in reverse order of creation) ---
-        print("Clearing old data...")
-        db.session.query(WatchlistItem).delete()
-        db.session.query(Watchlist).delete()
-        db.session.query(Transaction).delete()
-        db.session.query(Holding).delete()
-        db.session.query(Account).delete()
-        db.session.query(Asset).delete()
-        db.session.query(Portfolio).delete()
-        db.session.commit()
-        print("Old data cleared.")
+        # --- 1. Drop and Recreate All Tables ---
+        # This is the crucial step to reset the database completely,
+        # including all AUTO_INCREMENT counters.
+        print("Dropping all database tables...")
+        db.drop_all()
+        print("Creating all database tables from models...")
+        db.create_all()
+        print("Tables created successfully.")
+
 
         # --- 2. Create Portfolio ---
         portfolio = Portfolio(name='Main Portfolio')
         db.session.add(portfolio)
         db.session.commit()
-        print(f"Created portfolio '{portfolio.name}'.")
+        # This will now consistently be ID=1
+        print(f"Created portfolio '{portfolio.name}' with ID: {portfolio.id}.")
 
         # --- 3. Create Assets ---
         assets = {
@@ -86,22 +88,19 @@ def run_seed():
         watchlist2 = Watchlist(name="Dividend Stocks", portfolio_id=portfolio.id)
         watchlist3 = Watchlist(name="Growth & EV", portfolio_id=portfolio.id)
         db.session.add_all([watchlist1, watchlist2, watchlist3])
-        db.session.commit() # Commit to get watchlist IDs
+        db.session.commit()
 
         watchlist_items = [
-            # Tech Giants
             WatchlistItem(watchlist_id=watchlist1.id, asset_id=assets['AAPL'].id),
             WatchlistItem(watchlist_id=watchlist1.id, asset_id=assets['MSFT'].id),
             WatchlistItem(watchlist_id=watchlist1.id, asset_id=assets['GOOGL'].id),
             WatchlistItem(watchlist_id=watchlist1.id, asset_id=assets['AMZN'].id),
             WatchlistItem(watchlist_id=watchlist1.id, asset_id=assets['NVDA'].id),
             WatchlistItem(watchlist_id=watchlist1.id, asset_id=assets['V'].id),
-            # Dividend Stocks
             WatchlistItem(watchlist_id=watchlist2.id, asset_id=assets['JNJ'].id),
             WatchlistItem(watchlist_id=watchlist2.id, asset_id=assets['JPM'].id),
             WatchlistItem(watchlist_id=watchlist2.id, asset_id=assets['PG'].id),
             WatchlistItem(watchlist_id=watchlist2.id, asset_id=assets['MSFT'].id),
-            # Growth & EV
             WatchlistItem(watchlist_id=watchlist3.id, asset_id=assets['TSLA'].id),
             WatchlistItem(watchlist_id=watchlist3.id, asset_id=assets['NVDA'].id),
             WatchlistItem(watchlist_id=watchlist3.id, asset_id=assets['AMZN'].id)
