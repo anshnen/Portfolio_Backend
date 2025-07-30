@@ -1,252 +1,540 @@
 {
-    "openapi": "3.0.0",
-    "info": {
-      "title": "Portfolio Management API",
-      "description": "API for managing a financial portfolio, including accounts, holdings, and transactions.",
-      "version": "1.0.0"
-    },
-    "servers": [
-      {
-        "url": "/api/v1/"
-      }
-    ],
-    "paths": {
-      "/portfolio/{portfolio_id}/summary": {
-        "get": {
-          "summary": "Get Portfolio Summary",
-          "description": "Retrieves a full summary of a portfolio, including net worth, cash flow, and a breakdown of accounts and holdings. This is the main endpoint for the dashboard.",
-          "parameters": [
-            {
-              "name": "portfolio_id",
-              "in": "path",
-              "required": true,
-              "schema": {
-                "type": "integer",
-                "example": 1
-              }
-            }
-          ],
-          "responses": {
-            "200": {
-              "description": "A successful response with the portfolio summary.",
-              "content": {
-                "application/json": {
-                  "schema": {
-                    "$ref": "#/components/schemas/PortfolioSummary"
-                  }
-                }
-              }
-            },
-            "404": {
-              "description": "Portfolio not found"
-            }
-          }
-        }
-      },
-      "/transactions": {
-        "post": {
-          "summary": "Add a Transaction",
-          "description": "Adds a new financial transaction and updates relevant account balances and holdings.",
-          "requestBody": {
-            "required": true,
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NewTransaction"
-                }
-              }
-            }
-          },
-          "responses": {
-            "201": {
-              "description": "Transaction created successfully"
-            },
-            "400": {
-              "description": "Invalid input or insufficient funds/shares"
-            }
-          }
-        }
-      },
-      "/transactions/{transaction_id}": {
-  "put": {
-    "summary": "Update a Transaction",
-    "description": "Updates an existing transaction and adjusts related holdings and account balances if applicable.",
-    "parameters": [
-      {
-        "name": "transaction_id",
-        "in": "path",
-        "required": true,
-        "schema": {
-          "type": "integer",
-          "example": 12
-        }
-      }
-    ],
-    "requestBody": {
-      "required": true,
-      "content": {
-        "application/json": {
-          "schema": {
-            "$ref": "#/components/schemas/UpdateTransaction"
-          }
-        }
-      }
-    },
-    "responses": {
-      "200": {
-        "description": "Transaction updated successfully"
-      },
-      "400": {
-        "description": "Invalid input or business rule violation"
-      },
-      "404": {
-        "description": "Transaction not found"
-      }
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Portfolio Management API",
+    "description": "API for managing a financial portfolio, including accounts, holdings, transactions, and watchlists.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "/api/v1"
     }
-  }
-}
-,
-      "/portfolio/accounts": {
-        "get": {
-          "summary": "Get All Accounts",
-          "description": "Retrieves a list of all financial accounts in the portfolio.",
-          "responses": {
-            "200": {
-              "description": "A list of accounts.",
-              "content": {
-                "application/json": {
-                  "schema": {
-                    "type": "array",
-                    "items": {
-                      "$ref": "#/components/schemas/Account"
-                    }
+  ],
+  "paths": {
+    "/portfolio/{portfolio_id}/summary": {
+      "get": {
+        "summary": "Get Portfolio Summary",
+        "description": "Retrieves a full summary of a portfolio, including net worth, cash flow, and a breakdown of accounts and holdings. This is the main endpoint for the dashboard.",
+        "parameters": [
+          {
+            "name": "portfolio_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "example": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A successful response with the portfolio summary.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioSummary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Portfolio not found"
+          }
+        }
+      }
+    },
+    "/portfolio/accounts": {
+      "get": {
+        "summary": "Get All Accounts",
+        "description": "Retrieves a list of all financial accounts in the portfolio.",
+        "responses": {
+          "200": {
+            "description": "A list of accounts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Account"
                   }
                 }
               }
             }
           }
+        }
+      },
+      "post": {
+        "summary": "Add a New Account",
+        "description": "Creates a new financial account.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewAccount"
+              }
+            }
+          }
         },
-        "post": {
-          "summary": "Add a New Account",
-          "description": "Creates a new financial account.",
-          "requestBody": {
+        "responses": {
+          "201": {
+            "description": "Account created successfully"
+          },
+          "400": {
+            "description": "Missing required fields"
+          }
+        }
+      }
+    },
+    "/transactions": {
+      "post": {
+        "summary": "Add a Transaction",
+        "description": "Adds a new financial transaction and updates relevant account balances and holdings.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewTransaction"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Transaction created successfully"
+          },
+          "400": {
+            "description": "Invalid input or insufficient funds/shares"
+          }
+        }
+      }
+    },
+    "/transactions/{transaction_id}": {
+      "put": {
+        "summary": "Update a Transaction",
+        "description": "Updates an existing transaction. Note: Standard accounting practice is to reverse and create a new transaction rather than update.",
+        "parameters": [
+          {
+            "name": "transaction_id",
+            "in": "path",
             "required": true,
+            "schema": {
+              "type": "integer",
+              "example": 12
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTransaction"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Transaction updated successfully"
+          },
+          "400": {
+            "description": "Invalid input or business rule violation"
+          },
+          "404": {
+            "description": "Transaction not found"
+          }
+        }
+      }
+    },
+    "/watchlists/{portfolio_id}": {
+      "get": {
+        "summary": "Get All Watchlists",
+        "description": "Retrieves all watchlists and their items for a given portfolio.",
+        "parameters": [
+          {
+            "name": "portfolio_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "example": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of watchlists.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/NewAccount"
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Watchlist"
+                  }
                 }
               }
-            }
-          },
-          "responses": {
-            "201": {
-              "description": "Account created successfully"
-            },
-            "400": {
-              "description": "Missing required fields"
             }
           }
         }
       }
     },
-    "components": {
-      "schemas": {
-        "Account": {
-          "type": "object",
-          "properties": {
-            "id": { "type": "integer" },
-            "name": { "type": "string" },
-            "account_type": { "type": "string", "enum": ["CASH", "INVESTMENT", "RETIREMENT"] },
-            "institution": { "type": "string" },
-            "balance": { "type": "number", "format": "float" }
+    "/watchlists": {
+      "post": {
+        "summary": "Create a New Watchlist",
+        "description": "Creates a new, empty watchlist.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewWatchlist"
+              }
+            }
           }
         },
-        "NewAccount": {
-          "type": "object",
-          "properties": {
-            "name": { "type": "string", "example": "Chase Checking" },
-            "account_type": { "type": "string", "enum": ["CASH", "INVESTMENT", "RETIREMENT"] },
-            "institution": { "type": "string", "example": "Chase Bank" },
-            "balance": { "type": "number", "format": "float", "example": 5000.50 }
+        "responses": {
+          "201": {
+            "description": "Watchlist created successfully."
           },
-          "required": ["name", "account_type", "balance"]
+          "400": {
+            "description": "Invalid input or watchlist name already exists."
+          }
+        }
+      }
+    },
+    "/watchlists/{watchlist_id}/items": {
+      "post": {
+        "summary": "Add Item to Watchlist",
+        "description": "Adds a stock to a specific watchlist.",
+        "parameters": [
+          {
+            "name": "watchlist_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewWatchlistItem"
+              }
+            }
+          }
         },
-        "UpdateTransaction": {
-  "type": "object",
-  "description": "Payload for updating an existing transaction.",
-  "properties": {
-    "transaction_type": {
-      "type": "string",
-      "enum": ["BUY", "SELL", "DEPOSIT", "WITHDRAWAL", "DIVIDEND", "INTEREST", "FEE"]
+        "responses": {
+          "201": {
+            "description": "Item added successfully."
+          },
+          "400": {
+            "description": "Invalid input or item already in watchlist."
+          },
+          "404": {
+            "description": "Watchlist or Asset not found."
+          }
+        }
+      }
     },
-    "total_amount": {
-      "type": "number",
-      "format": "float",
-      "example": 1500.00
-    },
-    "transaction_date": {
-      "type": "string",
-      "format": "date",
-      "example": "2024-12-01"
-    },
-    "description": {
-      "type": "string",
-      "example": "Updated notes"
-    },
-    "asset_ticker": {
-      "type": "string",
-      "example": "AAPL"
-    },
-    "quantity": {
-      "type": "number",
-      "format": "float",
-      "example": 5
-    },
-    "price_per_unit": {
-      "type": "number",
-      "format": "float",
-      "example": 300.00
+    "/watchlists/{watchlist_id}/items/{asset_id}": {
+      "delete": {
+        "summary": "Remove Item from Watchlist",
+        "description": "Removes a stock from a specific watchlist.",
+        "parameters": [
+          {
+            "name": "watchlist_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "asset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Item removed successfully."
+          },
+          "404": {
+            "description": "Watchlist or item not found."
+          }
+        }
+      }
     }
   },
-  "required": []
-}
-,
-        "NewTransaction": {
-          "type": "object",
-          "properties": {
-            "account_id": { "type": "integer", "example": 1 },
-            "transaction_type": { "type": "string", "enum": ["BUY", "SELL", "DEPOSIT", "WITHDRAWAL", "DIVIDEND", "INTEREST", "FEE"] },
-            "total_amount": { "type": "number", "format": "float", "description": "Net cash effect. Negative for BUY, WITHDRAWAL, FEE.", "example": -2500.00 },
-            "transaction_date": { "type": "string", "format": "date", "example": "2024-10-26" },
-            "asset_ticker": { "type": "string", "description": "Required for BUY/SELL transactions.", "example": "AAPL" },
-            "quantity": { "type": "number", "format": "float", "description": "Required for BUY/SELL transactions.", "example": 10 },
-            "price_per_unit": { "type": "number", "format": "float", "description": "Required for BUY/SELL transactions.", "example": 250.00 }
+  "components": {
+    "schemas": {
+      "Account": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
           },
-          "required": ["account_id", "transaction_type", "total_amount", "transaction_date"]
+          "name": {
+            "type": "string"
+          },
+          "account_type": {
+            "type": "string",
+            "enum": [
+              "CASH",
+              "INVESTMENT",
+              "RETIREMENT"
+            ]
+          },
+          "institution": {
+            "type": "string"
+          },
+          "balance": {
+            "type": "number",
+            "format": "float"
+          }
+        }
+      },
+      "NewAccount": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Chase Checking"
+          },
+          "account_type": {
+            "type": "string",
+            "enum": [
+              "CASH",
+              "INVESTMENT",
+              "RETIREMENT"
+            ]
+          },
+          "institution": {
+            "type": "string",
+            "example": "Chase Bank"
+          },
+          "balance": {
+            "type": "number",
+            "format": "float",
+            "example": 5000.5
+          }
         },
-        "PortfolioSummary": {
-          "type": "object",
-          "properties": {
-            "net_worth": { "type": "number", "format": "float" },
-            "todays_change_amount": { "type": "number", "format": "float" },
-            "todays_change_percent": { "type": "number", "format": "float" },
-            "cash_flow": {
-              "type": "object",
-              "properties": {
-                "income": { "type": "number", "format": "float" },
-                "spending": { "type": "number", "format": "float" }
+        "required": [
+          "name",
+          "account_type",
+          "balance"
+        ]
+      },
+      "UpdateTransaction": {
+        "type": "object",
+        "description": "Payload for updating an existing transaction.",
+        "properties": {
+          "transaction_type": {
+            "type": "string",
+            "enum": [
+              "BUY",
+              "SELL",
+              "DEPOSIT",
+              "WITHDRAWAL",
+              "DIVIDEND",
+              "INTEREST",
+              "FEE"
+            ]
+          },
+          "total_amount": {
+            "type": "number",
+            "format": "float",
+            "example": 1500
+          },
+          "transaction_date": {
+            "type": "string",
+            "format": "date",
+            "example": "2024-12-01"
+          },
+          "description": {
+            "type": "string",
+            "example": "Updated notes"
+          },
+          "asset_ticker": {
+            "type": "string",
+            "example": "AAPL"
+          },
+          "quantity": {
+            "type": "number",
+            "format": "float",
+            "example": 5
+          },
+          "price_per_unit": {
+            "type": "number",
+            "format": "float",
+            "example": 300
+          }
+        },
+        "required": []
+      },
+      "NewTransaction": {
+        "type": "object",
+        "properties": {
+          "account_id": {
+            "type": "integer",
+            "example": 1
+          },
+          "transaction_type": {
+            "type": "string",
+            "enum": [
+              "BUY",
+              "SELL",
+              "DEPOSIT",
+              "WITHDRAWAL",
+              "DIVIDEND",
+              "INTEREST",
+              "FEE"
+            ]
+          },
+          "total_amount": {
+            "type": "number",
+            "format": "float",
+            "description": "Net cash effect. Negative for BUY, WITHDRAWAL, FEE.",
+            "example": -2500
+          },
+          "transaction_date": {
+            "type": "string",
+            "format": "date",
+            "example": "2024-10-26"
+          },
+          "asset_ticker": {
+            "type": "string",
+            "description": "Required for BUY/SELL transactions.",
+            "example": "AAPL"
+          },
+          "quantity": {
+            "type": "number",
+            "format": "float",
+            "description": "Required for BUY/SELL transactions.",
+            "example": 10
+          },
+          "price_per_unit": {
+            "type": "number",
+            "format": "float",
+            "description": "Required for BUY/SELL transactions.",
+            "example": 250
+          }
+        },
+        "required": [
+          "account_id",
+          "transaction_type",
+          "total_amount",
+          "transaction_date"
+        ]
+      },
+      "PortfolioSummary": {
+        "type": "object",
+        "properties": {
+          "net_worth": {
+            "type": "number",
+            "format": "float"
+          },
+          "todays_change_amount": {
+            "type": "number",
+            "format": "float"
+          },
+          "todays_change_percent": {
+            "type": "number",
+            "format": "float"
+          },
+          "cash_flow": {
+            "type": "object",
+            "properties": {
+              "income": {
+                "type": "number",
+                "format": "float"
+              },
+              "spending": {
+                "type": "number",
+                "format": "float"
               }
-            },
-            "accounts": {
-              "type": "array",
-              "items": {
-                "$ref": "#/components/schemas/Account"
-              }
+            }
+          },
+          "accounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Account"
             }
           }
         }
+      },
+      "WatchlistItem": {
+        "type": "object",
+        "properties": {
+          "asset_id": {
+            "type": "integer"
+          },
+          "ticker_symbol": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "last_price": {
+            "type": "number",
+            "format": "float"
+          }
+        }
+      },
+      "Watchlist": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WatchlistItem"
+            }
+          }
+        }
+      },
+      "NewWatchlist": {
+        "type": "object",
+        "properties": {
+          "portfolio_id": {
+            "type": "integer",
+            "example": 1
+          },
+          "name": {
+            "type": "string",
+            "example": "My Favorite Tech Stocks"
+          }
+        },
+        "required": [
+          "portfolio_id",
+          "name"
+        ]
+      },
+      "NewWatchlistItem": {
+        "type": "object",
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "example": "GOOGL"
+          }
+        },
+        "required": [
+          "ticker"
+        ]
       }
     }
   }
-  
+}
