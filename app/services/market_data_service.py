@@ -5,6 +5,55 @@ from decimal import Decimal
 
 class MarketDataService:
     @staticmethod
+    def update_asset_prices():
+        """
+        Fetches the latest market price for all unique stock/ETF assets
+        in the database and updates their records. This is the missing method.
+        """
+        print("Fetching all unique asset tickers from the database for price update...")
+        # Fetch all assets that are not 'CASH' or 'INDEX'
+        assets_to_update = Asset.query.filter(Asset.asset_type.in_(['STOCK', 'ETF'])).all()
+        
+        if not assets_to_update:
+            print("No assets to update.")
+            return
+
+        tickers = [asset.ticker_symbol for asset in assets_to_update]
+        tickers_str = " ".join(tickers)
+        print(f"Fetching market data for: {tickers_str}")
+
+        try:
+            # yfinance Tickers module is efficient for multiple tickers
+            ticker_data = yf.Tickers(tickers_str)
+
+            for asset in assets_to_update:
+                try:
+                    info = ticker_data.tickers[asset.ticker_symbol].info
+                    
+                    # Get current price, with a fallback to previous close
+                    last_price = info.get('currentPrice') or info.get('regularMarketPrice')
+                    prev_close = info.get('previousClose') or info.get('regularMarketPreviousClose')
+
+                    if last_price and prev_close:
+                        asset.last_price = Decimal(str(last_price))
+                        asset.previous_close_price = Decimal(str(prev_close))
+                        asset.price_updated_at = datetime.utcnow()
+                        print(f"Updated {asset.ticker_symbol}: Last Price={last_price}, Prev Close={prev_close}")
+                    else:
+                        print(f"Could not find price data for {asset.ticker_symbol}. Skipping.")
+
+                except Exception as e:
+                    print(f"Error processing ticker {asset.ticker_symbol}: {e}")
+
+            # Commit all the changes to the database in one transaction
+            db.session.commit()
+            print("Database successfully updated with new market prices.")
+
+        except Exception as e:
+            print(f"An error occurred while fetching data from yfinance: {e}")
+            db.session.rollback()
+
+    @staticmethod
     def find_or_create_asset(ticker: str):
         """Finds an asset by ticker or creates it by fetching data from yfinance."""
         ticker = ticker.upper()
@@ -42,7 +91,6 @@ class MarketDataService:
         """Gets detailed information and historical data for an asset."""
         asset = MarketDataService.find_or_create_asset(ticker)
         
-        # Fetch historical data if it's stale or missing
         latest_history = HistoricalPrice.query.filter_by(asset_id=asset.id).order_by(HistoricalPrice.price_date.desc()).first()
         if not latest_history or latest_history.price_date < (datetime.utcnow().date() - timedelta(days=1)):
             MarketDataService.update_historical_data(asset.id)
@@ -81,7 +129,6 @@ class MarketDataService:
             hist = ticker_obj.history(period=period)
             
             for index, row in hist.iterrows():
-                # Check if a record for this date already exists
                 record_exists = HistoricalPrice.query.filter_by(asset_id=asset.id, price_date=index.date()).first()
                 if not record_exists:
                     new_price = HistoricalPrice(

@@ -1,38 +1,45 @@
 # seed.py
 
 from app import create_app
-from app.models.models import db, Portfolio, Account, Asset, Holding, Transaction, Watchlist, WatchlistItem
+from app.models.models import db, User, Portfolio, Account, Asset, Holding, Transaction, Watchlist, WatchlistItem
 from datetime import date, timedelta
 from decimal import Decimal
+# In a real app, you'd use a library like Werkzeug for password hashing
+import hashlib 
 
 def run_seed():
     """
-    Populates the database with a realistic and consistent dataset for development and testing.
-    This script is now truly idempotent - it drops and recreates the entire schema
-    to ensure a clean state with predictable IDs every time.
+    Populates the database with a realistic and consistent dataset for a brokerage app.
+    This script is idempotent - it drops and recreates the entire schema.
     """
     app = create_app(config_name='development')
     with app.app_context():
         print("Starting database seed...")
 
         # --- 1. Drop and Recreate All Tables ---
-        # This is the crucial step to reset the database completely,
-        # including all AUTO_INCREMENT counters.
         print("Dropping all database tables...")
         db.drop_all()
         print("Creating all database tables from models...")
         db.create_all()
         print("Tables created successfully.")
 
+        # --- 2. Create a Sample User ---
+        print("Creating a sample user...")
+        # Simple hashing for seed script; use Werkzeug/bcrypt in a real app
+        password_hash = hashlib.sha256("password".encode()).hexdigest()
+        user = User(username="testuser", email="test@example.com", password_hash=password_hash)
+        db.session.add(user)
+        db.session.commit() # Commit to get the user ID
+        print(f"Created user '{user.username}' with ID: {user.id}.")
 
-        # --- 2. Create Portfolio ---
-        portfolio = Portfolio(name='Main Portfolio')
+        # --- 3. Create Portfolio for the User ---
+        # FIX: Pass the user_id when creating the portfolio
+        portfolio = Portfolio(name='Main Portfolio', user_id=user.id)
         db.session.add(portfolio)
         db.session.commit()
-        # This will now consistently be ID=1
-        print(f"Created portfolio '{portfolio.name}' with ID: {portfolio.id}.")
+        print(f"Created portfolio '{portfolio.name}' for user '{user.username}'.")
 
-        # --- 3. Create Assets ---
+        # --- 4. Create Assets ---
         assets = {
             'AAPL': Asset(ticker_symbol='AAPL', name='Apple Inc', asset_type='STOCK'),
             'MSFT': Asset(ticker_symbol='MSFT', name='Microsoft Corp', asset_type='STOCK'),
@@ -50,64 +57,50 @@ def run_seed():
         db.session.commit()
         print(f"Created {len(assets)} assets.")
 
-        # --- 4. Create Accounts ---
+        # --- 5. Create Accounts ---
         accounts = {
-            'checking': Account(portfolio_id=portfolio.id, name='Wells Fargo Checking', institution='Wells Fargo', account_type='CASH', balance=Decimal('309.13')),
-            'savings': Account(portfolio_id=portfolio.id, name='Wells Fargo Savings', institution='Wells Fargo', account_type='CASH', balance=Decimal('2000.67')),
-            'fidelity': Account(portfolio_id=portfolio.id, name='Fidelity Brokerage', institution='Fidelity', account_type='INVESTMENT'),
-            'pershing': Account(portfolio_id=portfolio.id, name='Pershing IRA', institution='Pershing', account_type='RETIREMENT')
+            'cash': Account(portfolio_id=portfolio.id, name='Cash Account', account_type='CASH', balance=Decimal('100000.00')),
+            'brokerage': Account(portfolio_id=portfolio.id, name='Brokerage Account', account_type='INVESTMENT')
         }
         db.session.add_all(accounts.values())
         db.session.commit()
         print(f"Created {len(accounts)} accounts.")
 
-        # --- 5. Create Holdings ---
+        # --- 6. Create Holdings ---
         holdings = [
-            Holding(account_id=accounts['fidelity'].id, asset_id=assets['AAPL'].id, quantity=Decimal('150.5'), cost_basis=Decimal('22500.00')),
-            Holding(account_id=accounts['fidelity'].id, asset_id=assets['MSFT'].id, quantity=Decimal('50'), cost_basis=Decimal('15000.00')),
-            Holding(account_id=accounts['pershing'].id, asset_id=assets['GOOGL'].id, quantity=Decimal('200'), cost_basis=Decimal('20000.00')),
-            Holding(account_id=accounts['pershing'].id, asset_id=assets['TSLA'].id, quantity=Decimal('100'), cost_basis=Decimal('25000.00'))
+            Holding(account_id=accounts['brokerage'].id, asset_id=assets['AAPL'].id, quantity=Decimal('150.5'), cost_basis=Decimal('22500.00')),
+            Holding(account_id=accounts['brokerage'].id, asset_id=assets['MSFT'].id, quantity=Decimal('50'), cost_basis=Decimal('15000.00')),
         ]
         db.session.add_all(holdings)
         db.session.commit()
         print(f"Created {len(holdings)} holdings.")
 
-        # --- 6. Create Transactions ---
+        # --- 7. Create Transactions ---
         transactions = [
-            Transaction(account_id=accounts['checking'].id, transaction_type='DEPOSIT', transaction_date=date.today() - timedelta(days=10), total_amount=Decimal('10000'), description='Salary'),
-            Transaction(account_id=accounts['fidelity'].id, asset_id=assets['AAPL'].id, transaction_type='DIVIDEND', transaction_date=date.today() - timedelta(days=5), total_amount=Decimal('8665')),
-            Transaction(account_id=accounts['checking'].id, transaction_type='WITHDRAWAL', transaction_date=date.today() - timedelta(days=15), total_amount=Decimal('-42500'), description='Mortgage Payment')
+            Transaction(account_id=accounts['cash'].id, transaction_type='DEPOSIT', transaction_date=date.today() - timedelta(days=30), total_amount=Decimal('100000'), description='Initial deposit'),
         ]
         db.session.add_all(transactions)
         db.session.commit()
         print(f"Created {len(transactions)} transactions.")
 
-        # --- 7. Create Watchlists and Items ---
+        # --- 8. Create Watchlists and Items ---
         print("Creating watchlists...")
         watchlist1 = Watchlist(name="Tech Giants", portfolio_id=portfolio.id)
-        watchlist2 = Watchlist(name="Dividend Stocks", portfolio_id=portfolio.id)
-        watchlist3 = Watchlist(name="Growth & EV", portfolio_id=portfolio.id)
-        db.session.add_all([watchlist1, watchlist2, watchlist3])
+        watchlist2 = Watchlist(name="Value Stocks", portfolio_id=portfolio.id)
+        db.session.add_all([watchlist1, watchlist2])
         db.session.commit()
 
         watchlist_items = [
-            WatchlistItem(watchlist_id=watchlist1.id, asset_id=assets['AAPL'].id),
-            WatchlistItem(watchlist_id=watchlist1.id, asset_id=assets['MSFT'].id),
             WatchlistItem(watchlist_id=watchlist1.id, asset_id=assets['GOOGL'].id),
             WatchlistItem(watchlist_id=watchlist1.id, asset_id=assets['AMZN'].id),
             WatchlistItem(watchlist_id=watchlist1.id, asset_id=assets['NVDA'].id),
-            WatchlistItem(watchlist_id=watchlist1.id, asset_id=assets['V'].id),
             WatchlistItem(watchlist_id=watchlist2.id, asset_id=assets['JNJ'].id),
             WatchlistItem(watchlist_id=watchlist2.id, asset_id=assets['JPM'].id),
             WatchlistItem(watchlist_id=watchlist2.id, asset_id=assets['PG'].id),
-            WatchlistItem(watchlist_id=watchlist2.id, asset_id=assets['MSFT'].id),
-            WatchlistItem(watchlist_id=watchlist3.id, asset_id=assets['TSLA'].id),
-            WatchlistItem(watchlist_id=watchlist3.id, asset_id=assets['NVDA'].id),
-            WatchlistItem(watchlist_id=watchlist3.id, asset_id=assets['AMZN'].id)
         ]
         db.session.add_all(watchlist_items)
         db.session.commit()
-        print(f"Created 3 watchlists with {len(watchlist_items)} items.")
+        print(f"Created 2 watchlists with {len(watchlist_items)} items.")
 
         print("\nDatabase seeded successfully! Run 'python update_prices.py' to fetch initial market data.")
 
