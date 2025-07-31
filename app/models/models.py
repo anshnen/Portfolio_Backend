@@ -5,12 +5,26 @@ from datetime import datetime
 
 db = SQLAlchemy()
 
+class User(db.Model):
+    __tablename__ = 'users'
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    password_hash = db.Column(db.String(128), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    portfolios = relationship('Portfolio', back_populates='user', cascade="all, delete-orphan")
+
+    def __repr__(self):
+        return f"<User(id={self.id}, username='{self.username}')>"
+
 class Portfolio(db.Model):
     __tablename__ = 'portfolios'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
+    user = relationship('User', back_populates='portfolios')
     accounts = relationship('Account', back_populates='portfolio', cascade="all, delete-orphan")
     watchlists = relationship('Watchlist', back_populates='portfolio', cascade="all, delete-orphan")
 
@@ -39,10 +53,13 @@ class Asset(db.Model):
     ticker_symbol = db.Column(db.String(20), unique=True, nullable=False)
     name = db.Column(db.String(100), nullable=False)
     asset_type = db.Column(db.String(50), nullable=False) # STOCK, ETF, CASH
+    market_cap = db.Column(db.BigInteger)
+    sector = db.Column(db.String(100))
     last_price = db.Column(db.Numeric(15, 4))
     previous_close_price = db.Column(db.Numeric(15, 4))
     price_updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
+    historical_prices = relationship('HistoricalPrice', back_populates='asset', cascade="all, delete-orphan")
     watchlist_items = relationship('WatchlistItem', back_populates='asset', cascade="all, delete-orphan")
 
     def __repr__(self):
@@ -74,6 +91,7 @@ class Transaction(db.Model):
     __tablename__ = 'transactions'
     id = db.Column(db.Integer, primary_key=True)
     transaction_type = db.Column(db.String(50), nullable=False) # BUY, SELL, DEPOSIT, WITHDRAWAL, DIVIDEND
+    status = db.Column(db.String(50), nullable=False, default='COMPLETED')
     transaction_date = db.Column(db.Date, nullable=False)
     quantity = db.Column(db.Numeric(15, 4))
     price_per_unit = db.Column(db.Numeric(15, 4))
@@ -114,3 +132,18 @@ class WatchlistItem(db.Model):
 
     def __repr__(self):
         return f"<WatchlistItem(watchlist_id={self.watchlist_id}, asset_id={self.asset_id})>"
+
+class HistoricalPrice(db.Model):
+    __tablename__ = 'historical_prices'
+    id = db.Column(db.BigInteger, primary_key=True)
+    asset_id = db.Column(db.Integer, db.ForeignKey('assets.id'), nullable=False)
+    price_date = db.Column(db.Date, nullable=False)
+    open_price = db.Column(db.Numeric(15, 4))
+    high_price = db.Column(db.Numeric(15, 4))
+    low_price = db.Column(db.Numeric(15, 4))
+    close_price = db.Column(db.Numeric(15, 4), nullable=False)
+    volume = db.Column(db.BigInteger)
+    asset = relationship('Asset', back_populates='historical_prices')
+
+    def __repr__(self):
+        return f"<HistoricalPrice(asset_id={self.asset_id}, date='{self.price_date}', close={self.close_price})>"
