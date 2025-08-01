@@ -1,3 +1,5 @@
+# app/models/models.py
+
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import relationship
 from decimal import Decimal
@@ -79,10 +81,8 @@ class Holding(db.Model):
     asset = relationship('Asset')
     
     @property
-    def market_value(self):
-        if self.asset and self.asset.last_price:
-            return self.quantity * self.asset.last_price
-        return Decimal('0.0')
+    def average_price(self):
+        return self.cost_basis / self.quantity if self.quantity > 0 else Decimal('0')
 
     def __repr__(self):
         return f"<Holding(account_id={self.account_id}, asset_id={self.asset_id}, quantity={self.quantity})>"
@@ -90,12 +90,16 @@ class Holding(db.Model):
 class Transaction(db.Model):
     __tablename__ = 'transactions'
     id = db.Column(db.Integer, primary_key=True)
-    transaction_type = db.Column(db.String(50), nullable=False) # BUY, SELL, DEPOSIT, WITHDRAWAL, DIVIDEND
+    transaction_type = db.Column(db.String(50), nullable=False)
     status = db.Column(db.String(50), nullable=False, default='COMPLETED')
+    order_type = db.Column(db.String(50)) # MARKET, LIMIT, STOP_LOSS
+    trigger_price = db.Column(db.Numeric(15, 4)) # For LIMIT and STOP_LOSS orders
     transaction_date = db.Column(db.Date, nullable=False)
     quantity = db.Column(db.Numeric(15, 4))
     price_per_unit = db.Column(db.Numeric(15, 4))
     total_amount = db.Column(db.Numeric(15, 2), nullable=False)
+    commission_fee = db.Column(db.Numeric(10, 2), default=0.00)
+    realized_pnl = db.Column(db.Numeric(15, 2)) # Realized Profit and Loss for SELL transactions
     description = db.Column(db.String(255))
     account_id = db.Column(db.Integer, db.ForeignKey('accounts.id'), nullable=False)
     asset_id = db.Column(db.Integer, db.ForeignKey('assets.id'))

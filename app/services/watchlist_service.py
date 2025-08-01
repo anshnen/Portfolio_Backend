@@ -1,3 +1,5 @@
+# app/services/watchlist_service.py
+
 from app.models.models import db, Watchlist, WatchlistItem, Asset, Portfolio
 from .market_data_service import MarketDataService
 
@@ -46,36 +48,18 @@ def add_item_to_watchlist(watchlist_id: int, ticker: str):
     if not watchlist:
         raise ValueError("Watchlist not found.")
     
-    ticker = ticker.upper()
-    
-    # 1. FIND: Check if the asset already exists in our database
-    asset = Asset.query.filter_by(ticker_symbol=ticker).first()
+    # Use the find_or_create_asset method from the market data service,
+    # which already contains the complete logic for finding or creating an asset.
+    # This avoids duplicating logic and ensures consistency.
+    try:
+        asset = MarketDataService.find_or_create_asset(ticker)
+    except ValueError as e:
+        raise e # Pass the error up to the API layer
 
-    # 2. CREATE (if not found)
-    if not asset:
-        print(f"Asset '{ticker}' not in DB. Fetching from external API...")
-        asset_info = MarketDataService.fetch_asset_info(ticker)
-        
-        if not asset_info:
-            raise ValueError(f"Could not find a valid asset for ticker '{ticker}'.")
-        
-        # Create a new Asset record
-        asset = Asset(
-            ticker_symbol=asset_info['ticker_symbol'],
-            name=asset_info['name'],
-            asset_type=asset_info['asset_type'],
-            last_price=asset_info['last_price'],
-            previous_close_price=asset_info['previous_close_price']
-        )
-        db.session.add(asset)
-        # We commit here to get an ID for the new asset before creating the watchlist item
-        db.session.commit()
-        print(f"New asset '{asset.name}' created and added to the database.")
-
-    # 3. LINK
+    # LINK
     existing_item = WatchlistItem.query.filter_by(watchlist_id=watchlist_id, asset_id=asset.id).first()
     if existing_item:
-        raise ValueError(f"Asset '{ticker}' is already in this watchlist.")
+        raise ValueError(f"Asset '{ticker.upper()}' is already in this watchlist.")
 
     new_item = WatchlistItem(watchlist_id=watchlist_id, asset_id=asset.id)
     db.session.add(new_item)
