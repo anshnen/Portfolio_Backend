@@ -54,18 +54,28 @@ class Asset(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     ticker_symbol = db.Column(db.String(20), unique=True, nullable=False)
     name = db.Column(db.String(100), nullable=False)
-    asset_type = db.Column(db.String(50), nullable=False) # STOCK, ETF, CASH
-    market_cap = db.Column(db.BigInteger)
-    sector = db.Column(db.String(100))
+    asset_type = db.Column(db.String(50), nullable=False)
+    
     last_price = db.Column(db.Numeric(15, 4))
     previous_close_price = db.Column(db.Numeric(15, 4))
-    price_updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    price_updated_at = db.Column(db.DateTime)
     
+    market_cap = db.Column(db.BigInteger)
+    sector = db.Column(db.String(100))
+    pe_ratio = db.Column(db.Numeric(10, 2))
+    eps = db.Column(db.Numeric(10, 2)) # Earnings Per Share
+    dividend_yield = db.Column(db.Numeric(10, 4))
+    beta = db.Column(db.Numeric(10, 4)) # Market volatility
+    
+    fifty_day_average = db.Column(db.Numeric(15, 4))
+    two_hundred_day_average = db.Column(db.Numeric(15, 4))
+
     historical_prices = relationship('HistoricalPrice', back_populates='asset', cascade="all, delete-orphan")
     watchlist_items = relationship('WatchlistItem', back_populates='asset', cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<Asset(id={self.id}, ticker='{self.ticker_symbol}')>"
+
 
 class Holding(db.Model):
     __tablename__ = 'holdings'
@@ -74,9 +84,6 @@ class Holding(db.Model):
     cost_basis = db.Column(db.Numeric(15, 2), nullable=False)
     account_id = db.Column(db.Integer, db.ForeignKey('accounts.id'), nullable=False)
     asset_id = db.Column(db.Integer, db.ForeignKey('assets.id'), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
     account = relationship('Account', back_populates='holdings')
     asset = relationship('Asset')
     
@@ -93,18 +100,16 @@ class Transaction(db.Model):
     transaction_type = db.Column(db.String(50), nullable=False)
     status = db.Column(db.String(50), nullable=False, default='COMPLETED')
     order_type = db.Column(db.String(50)) # MARKET, LIMIT, STOP_LOSS
-    trigger_price = db.Column(db.Numeric(15, 4)) # For LIMIT and STOP_LOSS orders
+    trigger_price = db.Column(db.Numeric(15, 4))
     transaction_date = db.Column(db.Date, nullable=False)
     quantity = db.Column(db.Numeric(15, 4))
     price_per_unit = db.Column(db.Numeric(15, 4))
     total_amount = db.Column(db.Numeric(15, 2), nullable=False)
     commission_fee = db.Column(db.Numeric(10, 2), default=0.00)
-    realized_pnl = db.Column(db.Numeric(15, 2)) # Realized Profit and Loss for SELL transactions
+    realized_pnl = db.Column(db.Numeric(15, 2))
     description = db.Column(db.String(255))
     account_id = db.Column(db.Integer, db.ForeignKey('accounts.id'), nullable=False)
     asset_id = db.Column(db.Integer, db.ForeignKey('assets.id'))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
     account = relationship('Account', back_populates='transactions')
     asset = relationship('Asset')
 
@@ -116,8 +121,6 @@ class Watchlist(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     portfolio_id = db.Column(db.Integer, db.ForeignKey('portfolios.id'), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
     portfolio = relationship('Portfolio', back_populates='watchlists')
     items = relationship('WatchlistItem', back_populates='watchlist', cascade="all, delete-orphan")
 
@@ -129,8 +132,6 @@ class WatchlistItem(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     watchlist_id = db.Column(db.Integer, db.ForeignKey('watchlists.id'), nullable=False)
     asset_id = db.Column(db.Integer, db.ForeignKey('assets.id'), nullable=False)
-    added_at = db.Column(db.DateTime, default=datetime.utcnow)
-
     watchlist = relationship('Watchlist', back_populates='items')
     asset = relationship('Asset', back_populates='watchlist_items')
 

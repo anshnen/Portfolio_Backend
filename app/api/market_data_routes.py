@@ -1,5 +1,3 @@
-# app/api/market_data_routes.py
-
 from flask import Blueprint, jsonify, request
 from app.services.market_data_service import MarketDataService
 
@@ -17,7 +15,10 @@ def search_assets_route():
 
 @market_data_bp.route('/asset/<string:ticker>', methods=['GET'])
 def get_asset_details_route(ticker):
-    """Get detailed information and historical data for a specific asset."""
+    """
+    Get detailed information for a specific asset, including fundamentals,
+    technicals, and historical data for charting.
+    """
     try:
         details = MarketDataService.get_asset_details(ticker)
         return jsonify(details), 200
