@@ -61,7 +61,7 @@ def add_item_route(watchlist_id):
         return jsonify({"error": "Missing asset ticker"}), 400
     try:
         item = watchlist_service.add_item_to_watchlist(watchlist_id, data['ticker'])
-        return jsonify({"message": "Item added successfully", "item_id": item.id}), 201
+        return jsonify({"message": "Item added successfully", "asset_id": item.asset_id}), 201
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     except Exception as e:
