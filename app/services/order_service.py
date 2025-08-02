@@ -33,7 +33,7 @@ class OrderService:
         asset = MarketDataService.find_or_create_asset(order_data['ticker'])
         current_price = asset.last_price
         if not current_price or current_price <= 0:
-            raise ValueError(f"Could not retrieve a valid market price for {asset.ticker_symbol}.")
+            raise ValueError(f"Could not retrieve a valid market price for {asset.ticker_symbol}.{asset}")
 
         # --- 2. Handle Pending Orders (LIMIT, STOP_LOSS) ---
         if order_type in ['LIMIT', 'STOP_LOSS']:
