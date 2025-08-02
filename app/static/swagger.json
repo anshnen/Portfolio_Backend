@@ -22,23 +22,9 @@
       "get": {
         "tags": ["Portfolio"],
         "summary": "Get Portfolio Summary",
-        "description": "Retrieves a full summary of a portfolio, including net worth, cash flow, insights, and a breakdown of accounts.",
         "parameters": [ { "$ref": "#/components/parameters/PortfolioId" } ],
         "responses": {
           "200": { "description": "A successful response with the portfolio summary.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PortfolioSummary" } } } },
-          "404": { "description": "Portfolio not found." }
-        }
-      }
-    },
-    "/accounts": {
-      "post": {
-        "tags": ["Portfolio"],
-        "summary": "Create a New Account",
-        "description": "Creates a new financial account for a given portfolio.",
-        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/NewAccount" } } } },
-        "responses": {
-          "201": { "description": "Account created successfully." },
-          "400": { "description": "Invalid input." },
           "404": { "description": "Portfolio not found." }
         }
       }
@@ -57,7 +43,6 @@
       "post": {
         "tags": ["Portfolio"],
         "summary": "Deposit or Withdraw Funds",
-        "description": "Manages funds for a specific CASH account.",
         "parameters": [ { "$ref": "#/components/parameters/AccountId" } ],
         "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ManageFunds" } } } },
         "responses": {
@@ -70,7 +55,6 @@
       "get": {
         "tags": ["Market Data"],
         "summary": "Search for Assets",
-        "description": "Searches for assets by ticker or name.",
         "parameters": [ { "name": "q", "in": "query", "required": true, "schema": { "type": "string" }, "description": "Search query (min 2 chars)", "example": "Apple" } ],
         "responses": {
           "200": { "description": "A list of matching assets.", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/AssetSearchResult" } } } } }
@@ -81,7 +65,6 @@
       "get": {
         "tags": ["Market Data"],
         "summary": "Get Asset Details",
-        "description": "Gets detailed information for a specific asset, including fundamentals, technicals, and historical data.",
         "parameters": [ { "$ref": "#/components/parameters/TickerSymbol" } ],
         "responses": {
           "200": { "description": "Detailed asset information.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AssetDetails" } } } },
@@ -89,22 +72,10 @@
         }
       }
     },
-    "/market-data/refresh": {
-      "post": {
-        "tags": ["Market Data"],
-        "summary": "Refresh Market Data",
-        "description": "Manually triggers a server-side process to update the market prices for all assets from the external data provider.",
-        "responses": {
-          "200": { "description": "Market data refresh completed successfully." },
-          "500": { "description": "An error occurred during the refresh process." }
-        }
-      }
-    },
     "/orders": {
       "post": {
         "tags": ["Orders"],
         "summary": "Place an Order",
-        "description": "Places a market, limit, or stop-loss order to buy or sell an asset.",
         "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/NewOrder" } } } },
         "responses": {
           "201": { "description": "Order placed successfully." },
@@ -116,7 +87,6 @@
       "get": {
         "tags": ["Transactions"],
         "summary": "Get Transactions for Account",
-        "description": "Retrieves the transaction history for a specific account.",
         "parameters": [ { "$ref": "#/components/parameters/AccountId" } ],
         "responses": {
           "200": { "description": "A list of transactions.", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Transaction" } } } } }
@@ -139,6 +109,21 @@
         "responses": { "201": { "description": "Watchlist created." }, "400": { "description": "Invalid input." } }
       }
     },
+    "/watchlists/{watchlist_id}": {
+        "patch": {
+            "tags": ["Watchlists"],
+            "summary": "Rename a Watchlist",
+            "parameters": [ { "$ref": "#/components/parameters/WatchlistId" } ],
+            "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RenameWatchlist" } } } },
+            "responses": { "200": { "description": "Watchlist renamed." }, "400": { "description": "Invalid input." }, "404": {"description": "Watchlist not found."}}
+        },
+        "delete": {
+            "tags": ["Watchlists"],
+            "summary": "Delete a Watchlist",
+            "parameters": [ { "$ref": "#/components/parameters/WatchlistId" } ],
+            "responses": { "200": { "description": "Watchlist deleted." }, "404": { "description": "Watchlist not found." } }
+        }
+    },
     "/watchlists/{watchlist_id}/items": {
       "post": {
         "tags": ["Watchlists"],
@@ -148,11 +133,11 @@
         "responses": { "201": { "description": "Item added." }, "400": { "description": "Invalid input." } }
       }
     },
-    "/watchlists/{watchlist_id}/items/{asset_id}": {
+    "/watchlists/{watchlist_id}/items/{ticker}": {
       "delete": {
         "tags": ["Watchlists"],
-        "summary": "Remove Item from Watchlist",
-        "parameters": [ { "$ref": "#/components/parameters/WatchlistId" }, { "$ref": "#/components/parameters/AssetId" } ],
+        "summary": "Remove Item from Watchlist by Ticker",
+        "parameters": [ { "$ref": "#/components/parameters/WatchlistId" }, { "$ref": "#/components/parameters/TickerSymbol" } ],
         "responses": { "200": { "description": "Item removed." }, "404": { "description": "Item not found." } }
       }
     }
@@ -167,18 +152,17 @@
     },
     "schemas": {
       "Account": { "type": "object", "properties": { "id": { "type": "integer" }, "name": { "type": "string" }, "account_type": { "type": "string" }, "balance": { "type": "number", "format": "float" } } },
-      "NewAccount": { "type": "object", "properties": { "portfolio_id": { "type": "integer", "example": 1 }, "name": { "type": "string", "example": "New Savings Account" }, "account_type": { "type": "string", "enum": ["CASH", "INVESTMENT", "RETIREMENT"] }, "balance": { "type": "number", "format": "float", "example": 1000.00 } }, "required": ["portfolio_id", "name", "account_type"] },
-      "PortfolioSummary": { "type": "object", "properties": { "net_worth": { "type": "number", "format": "float" }, "todays_change_amount": { "type": "number", "format": "float" }, "todays_change_percent": { "type": "number", "format": "float" }, "cash_flow": { "type": "object", "properties": { "income": { "type": "number", "format": "float" }, "spending": { "type": "number", "format": "float" } } }, "accounts": { "type": "array", "items": { "$ref": "#/components/schemas/Account" } }, "insights": { "type": "object", "properties": { "top_gainers": { "type": "array", "items": { "$ref": "#/components/schemas/MarketMover" } }, "top_losers": { "type": "array", "items": { "$ref": "#/components/schemas/MarketMover" } }, "sector_allocation": { "type": "object", "additionalProperties": { "type": "number", "format": "float" } } } } } },
-      "MarketMover": { "type": "object", "properties": { "ticker": { "type": "string" }, "name": { "type": "string" }, "change_amount": { "type": "number", "format": "float" }, "percent_change": { "type": "number", "format": "float" } } },
-      "AssetSearchResult": { "type": "object", "properties": { "ticker": { "type": "string", "example": "AAPL" }, "name": { "type": "string", "example": "Apple Inc." } } },
-      "AssetDetails": { "type": "object", "properties": { "asset_id": { "type": "integer" }, "ticker_symbol": { "type": "string" }, "name": { "type": "string" }, "last_price": { "type": "number", "format": "float" }, "fundamentals": { "type": "object", "properties": { "market_cap": { "type": "integer" }, "sector": { "type": "string" }, "pe_ratio": { "type": "number" }, "eps": { "type": "number" }, "dividend_yield": { "type": "number" }, "beta": { "type": "number" } } }, "technicals": { "type": "object", "properties": { "fifty_day_average": { "type": "number" }, "two_hundred_day_average": { "type": "number" } } }, "historical_data": { "type": "array", "items": { "type": "object", "properties": { "date": { "type": "string", "format": "date" }, "close": { "type": "number" } } } } } },
-      "NewOrder": { "type": "object", "properties": { "account_id": { "type": "integer", "example": 1 }, "ticker": { "type": "string", "example": "AAPL" }, "quantity": { "type": "number", "format": "float", "example": 10 }, "transaction_type": { "type": "string", "enum": [ "BUY", "SELL" ] }, "order_type": { "type": "string", "enum": [ "MARKET", "LIMIT", "STOP_LOSS" ] }, "trigger_price": { "type": "number", "format": "float", "description": "Required for LIMIT and STOP_LOSS orders", "example": 150.00 } }, "required": [ "account_id", "ticker", "quantity", "transaction_type", "order_type" ] },
-      "Transaction": { "type": "object", "properties": { "id": { "type": "integer" }, "transaction_type": { "type": "string" }, "status": { "type": "string" }, "order_type": { "type": "string" }, "transaction_date": { "type": "string", "format": "date" }, "total_amount": { "type": "number", "format": "float" }, "description": { "type": "string" }, "asset_ticker": { "type": "string" }, "quantity": { "type": "number", "format": "float" }, "price_per_unit": { "type": "number", "format": "float" }, "commission_fee": { "type": "number", "format": "float" }, "realized_pnl": { "type": "number", "format": "float" } } },
-      "WatchlistItem": { "type": "object", "properties": { "asset_id": { "type": "integer" }, "ticker_symbol": { "type": "string" }, "name": { "type": "string" }, "last_price": { "type": "number", "format": "float" } } },
+      "PortfolioSummary": { "type": "object", "properties": { "net_worth": { "type": "number", "format": "float" }, "accounts": { "type": "array", "items": { "$ref": "#/components/schemas/Account" } } } },
+      "AssetSearchResult": { "type": "object", "properties": { "ticker": { "type": "string" }, "name": { "type": "string" } } },
+      "AssetDetails": { "type": "object", "properties": { "asset_id": { "type": "integer" }, "ticker_symbol": { "type": "string" }, "name": { "type": "string" }, "last_price": { "type": "number", "format": "float" }, "historical_data": { "type": "array", "items": { "type": "object", "properties": { "date": { "type": "string", "format": "date" }, "close": { "type": "number" } } } } } },
+      "NewOrder": { "type": "object", "properties": { "account_id": { "type": "integer" }, "ticker": { "type": "string" }, "quantity": { "type": "number" }, "transaction_type": { "type": "string", "enum": [ "BUY", "SELL" ] }, "order_type": { "type": "string", "enum": [ "MARKET", "LIMIT", "STOP_LOSS" ] }, "trigger_price": { "type": "number" } }, "required": [ "account_id", "ticker", "quantity", "transaction_type", "order_type" ] },
+      "Transaction": { "type": "object", "properties": { "id": { "type": "integer" }, "transaction_type": { "type": "string" }, "status": { "type": "string" }, "total_amount": { "type": "number" } } },
+      "WatchlistItem": { "type": "object", "properties": { "asset_id": { "type": "integer" }, "ticker_symbol": { "type": "string" }, "name": { "type": "string" }, "last_price": { "type": "number" } } },
       "Watchlist": { "type": "object", "properties": { "id": { "type": "integer" }, "name": { "type": "string" }, "items": { "type": "array", "items": { "$ref": "#/components/schemas/WatchlistItem" } } } },
-      "NewWatchlist": { "type": "object", "properties": { "portfolio_id": { "type": "integer", "example": 1 }, "name": { "type": "string", "example": "My Tech Stocks" } }, "required": [ "portfolio_id", "name" ] },
-      "NewWatchlistItem": { "type": "object", "properties": { "ticker": { "type": "string", "example": "GOOGL" } }, "required": [ "ticker" ] },
-      "ManageFunds": { "type": "object", "properties": { "action": { "type": "string", "enum": [ "DEPOSIT", "WITHDRAWAL" ] }, "amount": { "type": "number", "format": "float", "example": 5000.00 } }, "required": [ "action", "amount" ] }
+      "NewWatchlist": { "type": "object", "properties": { "portfolio_id": { "type": "integer" }, "name": { "type": "string" } }, "required": [ "portfolio_id", "name" ] },
+      "RenameWatchlist": { "type": "object", "properties": { "name": { "type": "string", "example": "Updated Watchlist Name" } }, "required": [ "name" ] },
+      "NewWatchlistItem": { "type": "object", "properties": { "ticker": { "type": "string" } }, "required": [ "ticker" ] },
+      "ManageFunds": { "type": "object", "properties": { "action": { "type": "string", "enum": [ "DEPOSIT", "WITHDRAWAL" ] }, "amount": { "type": "number" } }, "required": [ "action", "amount" ] }
     }
   }
 }
