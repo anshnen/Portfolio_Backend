@@ -5,6 +5,14 @@ from decimal import Decimal
 from sqlalchemy import func, case
 from ..models.models import db, Portfolio, Account, Holding, Transaction
 
+def get_total_holdings_value(portfolio_id: int):
+    """Calculates the total market value of all assets held in a portfolio."""
+    holdings = Holding.query.join(Account).filter(Account.portfolio_id == portfolio_id).all()
+    
+    total_value = sum(holding.market_value for holding in holdings)
+    
+    return {"total_holdings_value": float(total_value)}, None
+
 def get_portfolio_summary(portfolio_id: int):
     """
     Calculates a full summary for a given portfolio, including advanced
@@ -31,7 +39,6 @@ def get_portfolio_summary(portfolio_id: int):
         net_worth += market_value
         investment_value += market_value
 
-        # Calculate daily change for each holding to find movers
         if holding.asset and holding.asset.last_price and holding.asset.previous_close_price:
             change_for_holding = (holding.asset.last_price - holding.asset.previous_close_price) * holding.quantity
             total_todays_change += change_for_holding
@@ -48,18 +55,15 @@ def get_portfolio_summary(portfolio_id: int):
                 "percent_change": float(percent_change)
             })
 
-        # Aggregate value by sector for allocation insights
         sector = holding.asset.sector or "Other"
         if sector not in sector_allocation:
             sector_allocation[sector] = Decimal('0.0')
         sector_allocation[sector] += market_value
 
-    # Add cash balances to net worth
     cash_accounts = Account.query.filter_by(portfolio_id=portfolio_id, account_type='CASH').all()
     for account in cash_accounts:
         net_worth += account.balance
 
-    # Finalize daily change percentage
     todays_change_percent = (total_todays_change / total_yesterday_value) * 100 if total_yesterday_value else Decimal('0.0')
 
     # --- 3. Determine Top 5 Gainers and Losers ---

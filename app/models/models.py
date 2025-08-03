@@ -4,6 +4,36 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import relationship
 from decimal import Decimal
 from datetime import datetime
+import enum
+
+# --- Enums for Data Integrity ---
+# Using enums ensures that type and status fields can only contain predefined values.
+
+class AccountType(enum.Enum):
+    CASH = "CASH"
+    INVESTMENT = "INVESTMENT"
+    RETIREMENT = "RETIREMENT"
+
+class AssetType(enum.Enum):
+    STOCK = "STOCK"
+    ETF = "ETF"
+    CASH = "CASH"
+    INDEX = "INDEX"
+
+class TransactionType(enum.Enum):
+    BUY = "BUY"
+    SELL = "SELL"
+    DEPOSIT = "DEPOSIT"
+    WITHDRAWAL = "WITHDRAWAL"
+    DIVIDEND = "DIVIDEND"
+    INTEREST = "INTEREST"
+    FEE = "FEE"
+
+class TransactionStatus(enum.Enum):
+    PENDING = "PENDING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
 
 db = SQLAlchemy()
 
@@ -25,6 +55,7 @@ class Portfolio(db.Model):
     name = db.Column(db.String(100), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     user = relationship('User', back_populates='portfolios')
     accounts = relationship('Account', back_populates='portfolio', cascade="all, delete-orphan")
@@ -37,24 +68,31 @@ class Account(db.Model):
     __tablename__ = 'accounts'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
-    account_type = db.Column(db.String(50), nullable=False) # CASH, INVESTMENT, RETIREMENT
+    account_type = db.Column(db.Enum(AccountType), nullable=False)
     institution = db.Column(db.String(100))
-    balance = db.Column(db.Numeric(15, 2), default=0.00)
+    balance = db.Column(db.Numeric(15, 2), default=0.00) # For CASH accounts, this is the total. For others, it's the cash portion.
     portfolio_id = db.Column(db.Integer, db.ForeignKey('portfolios.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     portfolio = relationship('Portfolio', back_populates='accounts')
     holdings = relationship('Holding', back_populates='account', cascade="all, delete-orphan")
     transactions = relationship('Transaction', back_populates='account', cascade="all, delete-orphan")
 
+    @property
+    def holdings_market_value(self):
+        """Calculates the total market value of all assets held in this account."""
+        return sum(holding.market_value for holding in self.holdings)
+
     def __repr__(self):
-        return f"<Account(id={self.id}, name='{self.name}', type='{self.account_type}')>"
+        return f"<Account(id={self.id}, name='{self.name}', type='{self.account_type.value}')>"
 
 class Asset(db.Model):
     __tablename__ = 'assets'
     id = db.Column(db.Integer, primary_key=True)
     ticker_symbol = db.Column(db.String(20), unique=True, nullable=False)
     name = db.Column(db.String(100), nullable=False)
-    asset_type = db.Column(db.String(50), nullable=False)
+    asset_type = db.Column(db.Enum(AssetType), nullable=False)
     
     last_price = db.Column(db.Numeric(15, 4))
     previous_close_price = db.Column(db.Numeric(15, 4))
@@ -63,9 +101,9 @@ class Asset(db.Model):
     market_cap = db.Column(db.BigInteger)
     sector = db.Column(db.String(100))
     pe_ratio = db.Column(db.Numeric(10, 2))
-    eps = db.Column(db.Numeric(10, 2)) # Earnings Per Share
+    eps = db.Column(db.Numeric(10, 2))
     dividend_yield = db.Column(db.Numeric(10, 4))
-    beta = db.Column(db.Numeric(10, 4)) # Market volatility
+    beta = db.Column(db.Numeric(10, 4))
     
     fifty_day_average = db.Column(db.Numeric(15, 4))
     two_hundred_day_average = db.Column(db.Numeric(15, 4))
@@ -75,7 +113,6 @@ class Asset(db.Model):
 
     def __repr__(self):
         return f"<Asset(id={self.id}, ticker='{self.ticker_symbol}')>"
-
 
 class Holding(db.Model):
     __tablename__ = 'holdings'
@@ -88,6 +125,12 @@ class Holding(db.Model):
     asset = relationship('Asset')
     
     @property
+    def market_value(self):
+        if self.asset and self.asset.last_price:
+            return self.quantity * self.asset.last_price
+        return Decimal('0.0')
+
+    @property
     def average_price(self):
         return self.cost_basis / self.quantity if self.quantity > 0 else Decimal('0')
 
@@ -97,9 +140,9 @@ class Holding(db.Model):
 class Transaction(db.Model):
     __tablename__ = 'transactions'
     id = db.Column(db.Integer, primary_key=True)
-    transaction_type = db.Column(db.String(50), nullable=False)
-    status = db.Column(db.String(50), nullable=False, default='COMPLETED')
-    order_type = db.Column(db.String(50)) # MARKET, LIMIT, STOP_LOSS
+    transaction_type = db.Column(db.Enum(TransactionType), nullable=False)
+    status = db.Column(db.Enum(TransactionStatus), nullable=False, default=TransactionStatus.COMPLETED)
+    order_type = db.Column(db.String(50))
     trigger_price = db.Column(db.Numeric(15, 4))
     transaction_date = db.Column(db.Date, nullable=False)
     quantity = db.Column(db.Numeric(15, 4))
@@ -114,13 +157,16 @@ class Transaction(db.Model):
     asset = relationship('Asset')
 
     def __repr__(self):
-        return f"<Transaction(id={self.id}, type='{self.transaction_type}', amount={self.total_amount})>"
+        return f"<Transaction(id={self.id}, type='{self.transaction_type.value}', amount={self.total_amount})>"
 
 class Watchlist(db.Model):
     __tablename__ = 'watchlists'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     portfolio_id = db.Column(db.Integer, db.ForeignKey('portfolios.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
     portfolio = relationship('Portfolio', back_populates='watchlists')
     items = relationship('WatchlistItem', back_populates='watchlist', cascade="all, delete-orphan")
 

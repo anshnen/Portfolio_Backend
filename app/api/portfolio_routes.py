@@ -1,8 +1,8 @@
 # app/api/portfolio_routes.py
 
 from flask import Blueprint, jsonify
-from ..services.portfolio_service import get_portfolio_summary
-from ..models.models import Account, Portfolio
+from ..services.portfolio_service import get_portfolio_summary, get_total_holdings_value
+from ..models.models import Portfolio
 
 portfolio_bp = Blueprint('portfolio_bp', __name__)
 
@@ -16,6 +16,17 @@ def get_summary_route(portfolio_id):
     if error:
         return jsonify({"error": error}), 404
     return jsonify(summary), 200
+
+@portfolio_bp.route('/<int:portfolio_id>/holdings-value', methods=['GET'])
+def get_holdings_value_route(portfolio_id):
+    """
+    Endpoint to get the total market value of all holdings in a portfolio.
+    """
+    value, error = get_total_holdings_value(portfolio_id)
+    if error:
+        return jsonify({"error": error}), 404
+    return jsonify(value), 200
+
 
 @portfolio_bp.route('/<int:portfolio_id>/performance/movers', methods=['GET'])
 def get_movers_route(portfolio_id):
