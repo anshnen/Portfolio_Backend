@@ -13,3 +13,6 @@ gunicorn
 nsepython
 alpha-vantage
 pandas
+polygon-api-client
+pytest
+pytest-mock

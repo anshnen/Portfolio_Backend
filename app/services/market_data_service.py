@@ -1,19 +1,53 @@
+# app/services/market_data_service.py
+
 import os
 import yfinance as yf
 from nsepython import nse_quote_ltp
 from alpha_vantage.fundamentaldata import FundamentalData
-from alpha_vantage.techindicators import TechIndicators
+from polygon import RESTClient
 from datetime import datetime, timedelta
-from app.models.models import db, Asset, HistoricalPrice
-from decimal import Decimal
+from app.models.models import db, Asset, HistoricalPrice, AssetType
+from decimal import Decimal, InvalidOperation
 import pandas as pd
+import time
 
 # --- Configuration ---
-ALPHA_VANTAGE_API_KEY = os.environ.get('ALPHA_VANTAGE_API_KEY', 'YOUR_DEFAULT_KEY')
-fd = FundamentalData(key=ALPHA_VANTAGE_API_KEY, output_format='pandas')
-ti = TechIndicators(key=ALPHA_VANTAGE_API_KEY, output_format='pandas')
+ALPHA_VANTAGE_API_KEY = os.environ.get('ALPHA_VANTAGE_API_KEY')
+POLYGON_API_KEY = os.environ.get('POLYGON_API_KEY')
+fd = FundamentalData(key=ALPHA_VANTAGE_API_KEY, output_format='pandas') if ALPHA_VANTAGE_API_KEY else None
+polygon_client = RESTClient(POLYGON_API_KEY) if POLYGON_API_KEY else None
+
+# --- Helper Functions for Robust Data Conversion ---
+def safe_decimal(value, default=Decimal('0.0')):
+    try:
+        if value is None or str(value).lower() in ['none', 'nan', '']: return default
+        return Decimal(str(value))
+    except (InvalidOperation, ValueError): return default
+
+def safe_int(value, default=0):
+    try:
+        if value is None or str(value).lower() in ['none', 'nan', '']: return default
+        return int(value)
+    except (ValueError, TypeError): return default
 
 class MarketDataService:
+    @staticmethod
+    def _get_live_price_data(ticker: str):
+        """[Internal Helper] Fetches live price data using a fallback chain."""
+        try:
+            price_data = nse_quote_ltp(ticker)
+            if price_data and price_data.get('priceInfo') and price_data['priceInfo'].get('lastPrice'):
+                print(f"Using nsepython for {ticker}")
+                return { "name": price_data['info']['companyName'], "last_price": safe_decimal(price_data['priceInfo']['lastPrice']), "previous_close": safe_decimal(price_data['priceInfo']['previousClose']) }
+        except Exception:
+            print(f"nsepython failed for {ticker}. Trying yfinance.")
+        
+        y_ticker = yf.Ticker(ticker)
+        info = y_ticker.info
+        if info and 'longName' in info:
+            return { "name": info.get('longName'), "last_price": safe_decimal(info.get('currentPrice')), "previous_close": safe_decimal(info.get('previousClose')) }
+        return None
+
     @staticmethod
     def find_or_create_asset(ticker: str):
         """Finds an asset by ticker or creates it by fetching comprehensive data."""
@@ -24,48 +58,48 @@ class MarketDataService:
 
         print(f"Asset '{ticker}' not in DB. Fetching from external APIs...")
         try:
-            # --- Data Fetching Chain ---
-            # 1. Try nsepython for price
-            try:
-                price_data = nse_quote_ltp(ticker)
-                name = price_data['info']['companyName']
-                last_price = Decimal(str(price_data['priceInfo']['lastPrice']))
-                prev_close = Decimal(str(price_data['priceInfo']['previousClose']))
-            except Exception:
-                # 2. Fallback to yfinance for price and basic info
-                y_ticker = yf.Ticker(ticker)
-                info = y_ticker.info
-                if not info or 'longName' not in info:
-                    raise ValueError(f"Invalid ticker or no data found for {ticker}")
-                name = info.get('longName')
-                last_price = Decimal(str(info.get('currentPrice', 0)))
-                prev_close = Decimal(str(info.get('previousClose', 0)))
+            price_info = MarketDataService._get_live_price_data(ticker)
+            if not price_info:
+                raise ValueError(f"Invalid ticker or no price data found for {ticker}")
 
-            # 3. Fetch fundamental and technical data from Alpha Vantage
-            try:
-                overview, _ = fd.get_company_overview(symbol=ticker)
-                sma50, _ = ti.get_sma(symbol=ticker, interval='daily', time_period=50, series_type='close')
-                sma200, _ = ti.get_sma(symbol=ticker, interval='daily', time_period=200, series_type='close')
-            except Exception as av_error:
-                print(f"Could not fetch Alpha Vantage data for {ticker}: {av_error}. Proceeding with basic data.")
-                overview = pd.DataFrame()
-                sma50 = pd.DataFrame()
-                sma200 = pd.DataFrame()
+            # --- Fetch Rich Details from Polygon.io ---
+            polygon_details = None
+            if polygon_client:
+                try:
+                    polygon_details = polygon_client.get_ticker_details(ticker)
+                except Exception as e:
+                    print(f"Could not fetch Polygon details for {ticker}: {e}")
 
+            # --- Fetch Fundamental Data from Alpha Vantage as a fallback ---
+            overview = pd.DataFrame()
+            if fd:
+                try:
+                    overview, _ = fd.get_company_overview(symbol=ticker)
+                except Exception as av_error:
+                    print(f"Could not fetch Alpha Vantage data for {ticker}: {av_error}.")
+            
+            # --- Create Asset with the best available data ---
             asset = Asset(
                 ticker_symbol=ticker,
-                name=name,
-                asset_type='STOCK',
-                last_price=last_price,
-                previous_close_price=prev_close,
-                market_cap=int(overview['MarketCapitalization'].iloc[0]) if not overview.empty and 'MarketCapitalization' in overview and overview['MarketCapitalization'].iloc[0] != 'None' else None,
-                sector=overview['Sector'].iloc[0] if not overview.empty and 'Sector' in overview else 'N/A',
-                pe_ratio=Decimal(str(overview['PERatio'].iloc[0])) if not overview.empty and 'PERatio' in overview and overview['PERatio'].iloc[0] != 'None' else None,
-                eps=Decimal(str(overview['EPS'].iloc[0])) if not overview.empty and 'EPS' in overview and overview['EPS'].iloc[0] != 'None' else None,
-                dividend_yield=Decimal(str(overview['DividendYield'].iloc[0])) if not overview.empty and 'DividendYield' in overview and overview['DividendYield'].iloc[0] != 'None' else None,
-                beta=Decimal(str(overview['Beta'].iloc[0])) if not overview.empty and 'Beta' in overview and overview['Beta'].iloc[0] != 'None' else None,
-                fifty_day_average=Decimal(str(sma50['SMA'].iloc[0])) if not sma50.empty else None,
-                two_hundred_day_average=Decimal(str(sma200['SMA'].iloc[0])) if not sma200.empty else None,
+                name=getattr(polygon_details, 'name', price_info['name']),
+                asset_type=AssetType.STOCK,
+                description=getattr(polygon_details, 'description', None),
+                homepage_url=getattr(polygon_details, 'homepage_url', None),
+                sic_description=getattr(polygon_details, 'sic_description', None),
+                list_date=getattr(polygon_details, 'list_date', None),
+                market=getattr(polygon_details, 'market', None),
+                locale=getattr(polygon_details, 'locale', None),
+                primary_exchange=getattr(polygon_details, 'primary_exchange', None),
+                total_employees=getattr(polygon_details, 'total_employees', None),
+                share_class_shares_outstanding=getattr(polygon_details, 'share_class_shares_outstanding', None),
+                last_price=price_info['last_price'],
+                previous_close_price=price_info['previous_close'],
+                # Use Polygon market cap if available, otherwise fallback to Alpha Vantage
+                market_cap=safe_int(getattr(polygon_details, 'market_cap', 0)) or safe_int(overview.loc['MarketCapitalization', 0]) if not overview.empty and 'MarketCapitalization' in overview.index else 0,
+                sector=getattr(polygon_details, 'sic_description', None) or (overview.loc['Sector', 0] if not overview.empty and 'Sector' in overview.index else 'N/A'),
+                pe_ratio=safe_decimal(overview.loc['PERatio', 0]) if not overview.empty and 'PERatio' in overview.index else Decimal('0.0'),
+                eps=safe_decimal(overview.loc['EPS', 0]) if not overview.empty and 'EPS' in overview.index else Decimal('0.0'),
+                dividend_yield=safe_decimal(overview.loc['DividendYield', 0]) if not overview.empty and 'DividendYield' in overview.index else Decimal('0.0'),
                 price_updated_at=datetime.utcnow()
             )
             db.session.add(asset)
@@ -77,11 +111,72 @@ class MarketDataService:
             raise ValueError(f"Could not fetch or create asset for {ticker}: {e}")
 
     @staticmethod
+    def update_all_asset_details():
+        """
+        Fetches and updates the full details (fundamentals, technicals) for all
+        existing assets in the database.
+        """
+        assets_to_update = Asset.query.filter(Asset.asset_type.in_([AssetType.STOCK, AssetType.ETF])).all()
+        if not assets_to_update:
+            print("No assets found for detail update.")
+            return
+
+        for asset in assets_to_update:
+            print(f"Updating full details for {asset.ticker_symbol}...")
+            try:
+                # --- Fetch from Polygon.io for rich details ---
+                if polygon_client:
+                    details = polygon_client.get_ticker_details(asset.ticker_symbol)
+                    asset.name = getattr(details, 'name', asset.name)
+                    asset.description = getattr(details, 'description', asset.description)
+                    asset.homepage_url = getattr(details, 'homepage_url', asset.homepage_url)
+                    asset.sic_description = getattr(details, 'sic_description', asset.sic_description)
+                    asset.market_cap = safe_int(getattr(details, 'market_cap', asset.market_cap))
+                
+                # --- Fetch from Alpha Vantage for fundamentals ---
+                if fd:
+                    overview, _ = fd.get_company_overview(symbol=asset.ticker_symbol)
+                    if not overview.empty:
+                        asset.pe_ratio = safe_decimal(overview.loc['PERatio', 0])
+                        asset.eps = safe_decimal(overview.loc['EPS', 0])
+                        asset.dividend_yield = safe_decimal(overview.loc['DividendYield', 0])
+                    time.sleep(12) # Respect rate limit
+
+                db.session.commit()
+                print(f"Successfully updated details for {asset.ticker_symbol}.")
+
+            except Exception as e:
+                print(f"Could not update details for {asset.ticker_symbol}: {e}")
+                db.session.rollback()
+                time.sleep(12) # Wait even if there's an error to avoid spamming a failing API
+
+    @staticmethod
+    def update_asset_prices():
+        """Fetches the latest market price for all assets using the best source."""
+        print("Starting bulk asset price update...")
+        assets_to_update = Asset.query.filter(Asset.asset_type.in_([AssetType.STOCK, AssetType.ETF])).all()
+        if not assets_to_update:
+            print("No assets to update.")
+            return
+
+        for asset in assets_to_update:
+            price_data = MarketDataService._get_live_price_data(asset.ticker_symbol)
+            if price_data and price_data.get('last_price'):
+                asset.last_price = price_data['last_price']
+                asset.previous_close_price = price_data['previous_close']
+                asset.price_updated_at = datetime.utcnow()
+                print(f"Updated {asset.ticker_symbol}: Price={asset.last_price}")
+            else:
+                print(f"Could not find price data for {asset.ticker_symbol}. Skipping.")
+        
+        db.session.commit()
+        print("Database price update finished.")
+    
+    @staticmethod
     def get_asset_details(ticker: str):
         """Gets detailed fundamental, technical, and historical data for an asset."""
         asset = MarketDataService.find_or_create_asset(ticker)
         
-        # Fetch historical data if it's stale or missing
         latest_history = HistoricalPrice.query.filter_by(asset_id=asset.id).order_by(HistoricalPrice.price_date.desc()).first()
         if not latest_history or latest_history.price_date < (datetime.utcnow().date() - timedelta(days=1)):
             MarketDataService.update_historical_data(asset.id)
@@ -92,19 +187,19 @@ class MarketDataService:
             "asset_id": asset.id,
             "ticker_symbol": asset.ticker_symbol,
             "name": asset.name,
-            "last_price": float(asset.last_price) if asset.last_price else None,
-            "previous_close_price": float(asset.previous_close_price) if asset.previous_close_price else None,
+            "description": asset.description,
+            "homepage_url": asset.homepage_url,
+            "list_date": asset.list_date.isoformat() if asset.list_date else None,
+            "market": asset.market,
+            "locale": asset.locale,
+            "last_price": float(asset.last_price) if asset.last_price is not None else 0.0,
+            "previous_close_price": float(asset.previous_close_price) if asset.previous_close_price is not None else 0.0,
             "fundamentals": {
                 "market_cap": asset.market_cap,
-                "sector": asset.sector,
-                "pe_ratio": float(asset.pe_ratio) if asset.pe_ratio else None,
-                "eps": float(asset.eps) if asset.eps else None,
-                "dividend_yield": float(asset.dividend_yield) if asset.dividend_yield else None,
-                "beta": float(asset.beta) if asset.beta else None,
-            },
-            "technicals": {
-                "fifty_day_average": float(asset.fifty_day_average) if asset.fifty_day_average else None,
-                "two_hundred_day_average": float(asset.two_hundred_day_average) if asset.two_hundred_day_average else None,
+                "sector": asset.sector or asset.sic_description,
+                "pe_ratio": float(asset.pe_ratio) if asset.pe_ratio is not None else 0.0,
+                "eps": float(asset.eps) if asset.eps is not None else 0.0,
+                "dividend_yield": float(asset.dividend_yield) if asset.dividend_yield is not None else 0.0,
             },
             "historical_data": [{"date": h.price_date.isoformat(), "close": float(h.close_price)} for h in historical_data]
         }
@@ -112,39 +207,31 @@ class MarketDataService:
     @staticmethod
     def update_asset_prices():
         """Fetches the latest market price for all assets using the best source."""
-        print("Fetching all unique asset tickers for price update...")
-        assets_to_update = Asset.query.filter(Asset.asset_type.in_(['STOCK', 'ETF'])).all()
+        print("Starting bulk asset price update...")
+        assets_to_update = Asset.query.filter(Asset.asset_type.in_([AssetType.STOCK, AssetType.ETF])).all()
         if not assets_to_update:
             print("No assets to update.")
             return
 
         for asset in assets_to_update:
-            try:
-                # Use the same data fetching chain as find_or_create_asset
-                price_data = nse_quote_ltp(asset.ticker_symbol)
-                asset.last_price = Decimal(str(price_data['priceInfo']['lastPrice']))
-                asset.previous_close_price = Decimal(str(price_data['priceInfo']['previousClose']))
+            price_data = MarketDataService._get_live_price_data(asset.ticker_symbol)
+            if price_data and price_data.get('last_price'):
+                asset.last_price = price_data['last_price']
+                asset.previous_close_price = price_data['previous_close']
                 asset.price_updated_at = datetime.utcnow()
-                print(f"Updated {asset.ticker_symbol} using nsepython.")
-            except Exception:
-                try:
-                    y_ticker = yf.Ticker(asset.ticker_symbol)
-                    info = y_ticker.info
-                    asset.last_price = Decimal(str(info.get('currentPrice', 0)))
-                    asset.previous_close_price = Decimal(str(info.get('previousClose', 0)))
-                    asset.price_updated_at = datetime.utcnow()
-                    print(f"Updated {asset.ticker_symbol} using yfinance.")
-                except Exception as yf_error:
-                    print(f"Could not update price for {asset.ticker_symbol} from any source: {yf_error}")
+                print(f"Updated {asset.ticker_symbol}: Price={asset.last_price}")
+            else:
+                print(f"Could not find price data for {asset.ticker_symbol}. Skipping.")
         
         db.session.commit()
         print("Database price update finished.")
+
 
     @staticmethod
     def update_historical_data(asset_id: int, period="1y"):
         """Fetches and stores historical data for a given asset using yfinance."""
         asset = Asset.query.get(asset_id)
-        if not asset or asset.asset_type not in ['STOCK', 'ETF', 'INDEX']:
+        if not asset or asset.asset_type not in [AssetType.STOCK, AssetType.ETF, AssetType.INDEX]:
             return
 
         print(f"Updating historical data for {asset.ticker_symbol}...")
@@ -158,11 +245,11 @@ class MarketDataService:
                     new_price = HistoricalPrice(
                         asset_id=asset.id,
                         price_date=index.date(),
-                        open_price=Decimal(str(row['Open'])),
-                        high_price=Decimal(str(row['High'])),
-                        low_price=Decimal(str(row['Low'])),
-                        close_price=Decimal(str(row['Close'])),
-                        volume=row['Volume']
+                        open_price=safe_decimal(row.get('Open')),
+                        high_price=safe_decimal(row.get('High')),
+                        low_price=safe_decimal(row.get('Low')),
+                        close_price=safe_decimal(row.get('Close')),
+                        volume=safe_int(row.get('Volume'))
                     )
                     db.session.add(new_price)
             db.session.commit()

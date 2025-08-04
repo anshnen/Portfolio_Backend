@@ -7,8 +7,6 @@ from datetime import datetime
 import enum
 
 # --- Enums for Data Integrity ---
-# Using enums ensures that type and status fields can only contain predefined values.
-
 class AccountType(enum.Enum):
     CASH = "CASH"
     INVESTMENT = "INVESTMENT"
@@ -55,7 +53,6 @@ class Portfolio(db.Model):
     name = db.Column(db.String(100), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     user = relationship('User', back_populates='portfolios')
     accounts = relationship('Account', back_populates='portfolio', cascade="all, delete-orphan")
@@ -70,10 +67,8 @@ class Account(db.Model):
     name = db.Column(db.String(100), nullable=False)
     account_type = db.Column(db.Enum(AccountType), nullable=False)
     institution = db.Column(db.String(100))
-    balance = db.Column(db.Numeric(15, 2), default=0.00) # For CASH accounts, this is the total. For others, it's the cash portion.
+    balance = db.Column(db.Numeric(15, 2), default=0.00)
     portfolio_id = db.Column(db.Integer, db.ForeignKey('portfolios.id'), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     portfolio = relationship('Portfolio', back_populates='accounts')
     holdings = relationship('Holding', back_populates='account', cascade="all, delete-orphan")
@@ -81,7 +76,6 @@ class Account(db.Model):
 
     @property
     def holdings_market_value(self):
-        """Calculates the total market value of all assets held in this account."""
         return sum(holding.market_value for holding in self.holdings)
 
     def __repr__(self):
@@ -94,20 +88,30 @@ class Asset(db.Model):
     name = db.Column(db.String(100), nullable=False)
     asset_type = db.Column(db.Enum(AssetType), nullable=False)
     
+    # --- Detailed fields from Polygon.io ---
+    description = db.Column(db.Text)
+    homepage_url = db.Column(db.String(255))
+    sic_description = db.Column(db.String(255)) # Industry classification
+    list_date = db.Column(db.Date)
+    market = db.Column(db.String(50))
+    locale = db.Column(db.String(20))
+    primary_exchange = db.Column(db.String(50))
+    total_employees = db.Column(db.Integer)
+    share_class_shares_outstanding = db.Column(db.BigInteger)
+    
+    # --- Price Data ---
     last_price = db.Column(db.Numeric(15, 4))
     previous_close_price = db.Column(db.Numeric(15, 4))
     price_updated_at = db.Column(db.DateTime)
     
+    # --- Fundamental Data ---
     market_cap = db.Column(db.BigInteger)
-    sector = db.Column(db.String(100))
+    sector = db.Column(db.String(100)) # Can be derived from sic_description
     pe_ratio = db.Column(db.Numeric(10, 2))
     eps = db.Column(db.Numeric(10, 2))
     dividend_yield = db.Column(db.Numeric(10, 4))
-    beta = db.Column(db.Numeric(10, 4))
     
-    fifty_day_average = db.Column(db.Numeric(15, 4))
-    two_hundred_day_average = db.Column(db.Numeric(15, 4))
-
+    # --- Relationships ---
     historical_prices = relationship('HistoricalPrice', back_populates='asset', cascade="all, delete-orphan")
     watchlist_items = relationship('WatchlistItem', back_populates='asset', cascade="all, delete-orphan")
 
@@ -164,9 +168,6 @@ class Watchlist(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     portfolio_id = db.Column(db.Integer, db.ForeignKey('portfolios.id'), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
     portfolio = relationship('Portfolio', back_populates='watchlists')
     items = relationship('WatchlistItem', back_populates='watchlist', cascade="all, delete-orphan")
 

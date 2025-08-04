@@ -33,7 +33,6 @@ def create_app(config_name='default'):
     from .api.watchlist_routes import watchlist_bp
     from .api.market_data_routes import market_data_bp
     from .api.order_routes import order_bp
-    # FIX: Added the missing account blueprint to support account-related endpoints
     from .api.account_routes import account_bp 
 
     app.register_blueprint(portfolio_bp, url_prefix='/api/v1/portfolio')
@@ -41,7 +40,6 @@ def create_app(config_name='default'):
     app.register_blueprint(watchlist_bp, url_prefix='/api/v1/watchlists')
     app.register_blueprint(market_data_bp, url_prefix='/api/v1/market')
     app.register_blueprint(order_bp, url_prefix='/api/v1/orders')
-    # FIX: Registered the new account blueprint
     app.register_blueprint(account_bp, url_prefix='/api/v1/accounts')
 
     # --- Swagger UI Configuration ---
