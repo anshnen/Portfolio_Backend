@@ -115,3 +115,33 @@ def get_portfolio_summary(portfolio_id: int):
     }
 
     return summary, None
+
+# --- 7. Get Detailed Holdings ---
+def get_detailed_holdings(portfolio_id: int):
+    """
+    Retrieves a detailed list of all individual holdings for a portfolio,
+    including calculated metrics like market value and unrealized P&L.
+    """
+    holdings = Holding.query.join(Account).filter(Account.portfolio_id == portfolio_id).all()
+    if not holdings:
+        return [], None
+
+    detailed_holdings = []
+    for holding in holdings:
+        market_value = holding.market_value
+        unrealized_pnl = market_value - holding.cost_basis
+        
+        detailed_holdings.append({
+            "holding_id": holding.id,
+            "account_name": holding.account.name,
+            "ticker_symbol": holding.asset.ticker_symbol,
+            "asset_name": holding.asset.name,
+            "quantity": float(holding.quantity),
+            "average_price": float(holding.average_price),
+            "cost_basis": float(holding.cost_basis),
+            "market_value": float(market_value),
+            "unrealized_pnl": float(unrealized_pnl),
+            "last_price": float(holding.asset.last_price) if holding.asset.last_price else None
+        })
+        
+    return detailed_holdings, None

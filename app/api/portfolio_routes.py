@@ -1,38 +1,38 @@
 # app/api/portfolio_routes.py
 
 from flask import Blueprint, jsonify
-from ..services.portfolio_service import get_portfolio_summary, get_total_holdings_value
+from ..services.portfolio_service import get_portfolio_summary, get_total_holdings_value, get_detailed_holdings
 from ..models.models import Portfolio
 
 portfolio_bp = Blueprint('portfolio_bp', __name__)
 
 @portfolio_bp.route('/<int:portfolio_id>/summary', methods=['GET'])
 def get_summary_route(portfolio_id):
-    """
-    Endpoint to get a full summary of a portfolio.
-    This is the main endpoint for the dashboard UI.
-    """
+    """Endpoint to get a full summary of a portfolio."""
     summary, error = get_portfolio_summary(portfolio_id)
     if error:
         return jsonify({"error": error}), 404
     return jsonify(summary), 200
 
+@portfolio_bp.route('/<int:portfolio_id>/holdings', methods=['GET'])
+def get_holdings_route(portfolio_id):
+    """Endpoint to get a detailed list of all holdings in a portfolio."""
+    holdings, error = get_detailed_holdings(portfolio_id)
+    if error:
+        return jsonify({"error": error}), 404
+    return jsonify(holdings), 200
+
 @portfolio_bp.route('/<int:portfolio_id>/holdings-value', methods=['GET'])
 def get_holdings_value_route(portfolio_id):
-    """
-    Endpoint to get the total market value of all holdings in a portfolio.
-    """
+    """Endpoint to get the total market value of all holdings in a portfolio."""
     value, error = get_total_holdings_value(portfolio_id)
     if error:
         return jsonify({"error": error}), 404
     return jsonify(value), 200
 
-
 @portfolio_bp.route('/<int:portfolio_id>/performance/movers', methods=['GET'])
 def get_movers_route(portfolio_id):
-    """
-    Endpoint to get only the top 5 daily gainers and losers for a portfolio.
-    """
+    """Endpoint to get only the top 5 daily gainers and losers for a portfolio."""
     summary, error = get_portfolio_summary(portfolio_id)
     if error:
         return jsonify({"error": error}), 404
@@ -45,9 +45,7 @@ def get_movers_route(portfolio_id):
 
 @portfolio_bp.route('/<int:portfolio_id>/allocation', methods=['GET'])
 def get_allocation_route(portfolio_id):
-    """
-    Endpoint to get the portfolio's asset allocation by sector.
-    """
+    """Endpoint to get the portfolio's asset allocation by sector."""
     summary, error = get_portfolio_summary(portfolio_id)
     if error:
         return jsonify({"error": error}), 404
@@ -65,8 +63,8 @@ def get_accounts_route(portfolio_id):
     accounts_data = [{
         "id": acc.id,
         "name": acc.name,
-        "account_type": acc.account_type,
-        "balance": float(acc.balance) if acc.account_type == 'CASH' else float(sum(h.market_value for h in acc.holdings))
+        "account_type": acc.account_type.value,
+        "balance": float(acc.balance + acc.holdings_market_value)
     } for acc in portfolio.accounts]
     
     return jsonify(accounts_data), 200

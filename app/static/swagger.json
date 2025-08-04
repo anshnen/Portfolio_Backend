@@ -3,13 +3,9 @@
   "info": {
     "title": "Brokerage API",
     "description": "A comprehensive REST API for a brokerage platform, supporting portfolio management, market data, orders, and watchlists.",
-    "version": "1.2.0"
+    "version": "1.3.0"
   },
-  "servers": [
-    {
-      "url": "/api/v1"
-    }
-  ],
+  "servers": [ { "url": "/api/v1" } ],
   "tags": [
     { "name": "Portfolio", "description": "High-level portfolio and account management." },
     { "name": "Market Data", "description": "Endpoints for searching and retrieving asset information." },
@@ -26,6 +22,17 @@
         "responses": {
           "200": { "description": "A successful response with the portfolio summary.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PortfolioSummary" } } } },
           "404": { "description": "Portfolio not found." }
+        }
+      }
+    },
+    "/portfolio/{portfolio_id}/holdings": {
+      "get": {
+        "tags": ["Portfolio"],
+        "summary": "Get Detailed Holdings",
+        "description": "Retrieves a detailed list of all individual asset holdings for a portfolio.",
+        "parameters": [ { "$ref": "#/components/parameters/PortfolioId" } ],
+        "responses": {
+          "200": { "description": "A list of detailed holdings.", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/DetailedHolding" } } } } }
         }
       }
     },
@@ -55,7 +62,7 @@
       "get": {
         "tags": ["Market Data"],
         "summary": "Search for Assets",
-        "parameters": [ { "name": "q", "in": "query", "required": true, "schema": { "type": "string" }, "description": "Search query (min 2 chars)", "example": "Apple" } ],
+        "parameters": [ { "name": "q", "in": "query", "required": true, "schema": { "type": "string" }, "example": "Apple" } ],
         "responses": {
           "200": { "description": "A list of matching assets.", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/AssetSearchResult" } } } } }
         }
@@ -79,7 +86,7 @@
         "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/NewOrder" } } } },
         "responses": {
           "201": { "description": "Order placed successfully." },
-          "400": { "description": "Invalid input, insufficient funds, or insufficient shares." }
+          "400": { "description": "Invalid input." }
         }
       }
     },
@@ -100,69 +107,41 @@
         "parameters": [ { "$ref": "#/components/parameters/PortfolioId" } ],
         "responses": { "200": { "description": "A list of watchlists.", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Watchlist" } } } } } }
       }
-    },
-    "/watchlists": {
-      "post": {
-        "tags": ["Watchlists"],
-        "summary": "Create a Watchlist",
-        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/NewWatchlist" } } } },
-        "responses": { "201": { "description": "Watchlist created." }, "400": { "description": "Invalid input." } }
-      }
-    },
-    "/watchlists/{watchlist_id}": {
-        "patch": {
-            "tags": ["Watchlists"],
-            "summary": "Rename a Watchlist",
-            "parameters": [ { "$ref": "#/components/parameters/WatchlistId" } ],
-            "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RenameWatchlist" } } } },
-            "responses": { "200": { "description": "Watchlist renamed." }, "400": { "description": "Invalid input." }, "404": {"description": "Watchlist not found."}}
-        },
-        "delete": {
-            "tags": ["Watchlists"],
-            "summary": "Delete a Watchlist",
-            "parameters": [ { "$ref": "#/components/parameters/WatchlistId" } ],
-            "responses": { "200": { "description": "Watchlist deleted." }, "404": { "description": "Watchlist not found." } }
-        }
-    },
-    "/watchlists/{watchlist_id}/items": {
-      "post": {
-        "tags": ["Watchlists"],
-        "summary": "Add Item to Watchlist",
-        "parameters": [ { "$ref": "#/components/parameters/WatchlistId" } ],
-        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/NewWatchlistItem" } } } },
-        "responses": { "201": { "description": "Item added." }, "400": { "description": "Invalid input." } }
-      }
-    },
-    "/watchlists/{watchlist_id}/items/{ticker}": {
-      "delete": {
-        "tags": ["Watchlists"],
-        "summary": "Remove Item from Watchlist by Ticker",
-        "parameters": [ { "$ref": "#/components/parameters/WatchlistId" }, { "$ref": "#/components/parameters/TickerSymbol" } ],
-        "responses": { "200": { "description": "Item removed." }, "404": { "description": "Item not found." } }
-      }
     }
   },
   "components": {
     "parameters": {
       "PortfolioId": { "name": "portfolio_id", "in": "path", "required": true, "schema": { "type": "integer", "example": 1 } },
       "AccountId": { "name": "account_id", "in": "path", "required": true, "schema": { "type": "integer", "example": 1 } },
-      "WatchlistId": { "name": "watchlist_id", "in": "path", "required": true, "schema": { "type": "integer", "example": 1 } },
-      "AssetId": { "name": "asset_id", "in": "path", "required": true, "schema": { "type": "integer", "example": 1 } },
       "TickerSymbol": { "name": "ticker", "in": "path", "required": true, "schema": { "type": "string", "example": "AAPL" } }
     },
     "schemas": {
       "Account": { "type": "object", "properties": { "id": { "type": "integer" }, "name": { "type": "string" }, "account_type": { "type": "string" }, "balance": { "type": "number", "format": "float" } } },
-      "PortfolioSummary": { "type": "object", "properties": { "net_worth": { "type": "number", "format": "float" }, "accounts": { "type": "array", "items": { "$ref": "#/components/schemas/Account" } } } },
+      "PortfolioSummary": { "type": "object", "properties": { "net_worth": { "type": "number", "format": "float" }, "insights": { "type": "object", "properties": { "top_gainers": { "type": "array", "items": { "$ref": "#/components/schemas/MarketMover" } } } } } },
+      "MarketMover": { "type": "object", "properties": { "ticker": { "type": "string" }, "name": { "type": "string" }, "change_amount": { "type": "number", "format": "float" }, "percent_change": { "type": "number", "format": "float" } } },
       "AssetSearchResult": { "type": "object", "properties": { "ticker": { "type": "string" }, "name": { "type": "string" } } },
-      "AssetDetails": { "type": "object", "properties": { "asset_id": { "type": "integer" }, "ticker_symbol": { "type": "string" }, "name": { "type": "string" }, "last_price": { "type": "number", "format": "float" }, "historical_data": { "type": "array", "items": { "type": "object", "properties": { "date": { "type": "string", "format": "date" }, "close": { "type": "number" } } } } } },
-      "NewOrder": { "type": "object", "properties": { "account_id": { "type": "integer" }, "ticker": { "type": "string" }, "quantity": { "type": "number" }, "transaction_type": { "type": "string", "enum": [ "BUY", "SELL" ] }, "order_type": { "type": "string", "enum": [ "MARKET", "LIMIT", "STOP_LOSS" ] }, "trigger_price": { "type": "number" } }, "required": [ "account_id", "ticker", "quantity", "transaction_type", "order_type" ] },
-      "Transaction": { "type": "object", "properties": { "id": { "type": "integer" }, "transaction_type": { "type": "string" }, "status": { "type": "string" }, "total_amount": { "type": "number" } } },
-      "WatchlistItem": { "type": "object", "properties": { "asset_id": { "type": "integer" }, "ticker_symbol": { "type": "string" }, "name": { "type": "string" }, "last_price": { "type": "number" } } },
-      "Watchlist": { "type": "object", "properties": { "id": { "type": "integer" }, "name": { "type": "string" }, "items": { "type": "array", "items": { "$ref": "#/components/schemas/WatchlistItem" } } } },
+      "AssetDetails": { "type": "object", "properties": { "asset_id": { "type": "integer" }, "name": { "type": "string" }, "last_price": { "type": "number" }, "historical_data": { "type": "array", "items": { "type": "object", "properties": { "date": { "type": "string" }, "close": { "type": "number" } } } } } },
+      "NewOrder": { "type": "object", "properties": { "account_id": { "type": "integer" }, "ticker": { "type": "string" }, "quantity": { "type": "number" }, "transaction_type": { "type": "string" }, "order_type": { "type": "string" } }, "required": [ "account_id", "ticker", "quantity", "transaction_type", "order_type" ] },
+      "Transaction": { "type": "object", "properties": { "id": { "type": "integer" }, "transaction_type": { "type": "string" } } },
+      "Watchlist": { "type": "object", "properties": { "id": { "type": "integer" }, "name": { "type": "string" } } },
       "NewWatchlist": { "type": "object", "properties": { "portfolio_id": { "type": "integer" }, "name": { "type": "string" } }, "required": [ "portfolio_id", "name" ] },
-      "RenameWatchlist": { "type": "object", "properties": { "name": { "type": "string", "example": "Updated Watchlist Name" } }, "required": [ "name" ] },
       "NewWatchlistItem": { "type": "object", "properties": { "ticker": { "type": "string" } }, "required": [ "ticker" ] },
-      "ManageFunds": { "type": "object", "properties": { "action": { "type": "string", "enum": [ "DEPOSIT", "WITHDRAWAL" ] }, "amount": { "type": "number" } }, "required": [ "action", "amount" ] }
+      "ManageFunds": { "type": "object", "properties": { "action": { "type": "string" }, "amount": { "type": "number" } }, "required": [ "action", "amount" ] },
+      "DetailedHolding": {
+        "type": "object",
+        "properties": {
+          "holding_id": { "type": "integer" },
+          "account_name": { "type": "string" },
+          "ticker_symbol": { "type": "string" },
+          "asset_name": { "type": "string" },
+          "quantity": { "type": "number", "format": "float" },
+          "average_price": { "type": "number", "format": "float" },
+          "cost_basis": { "type": "number", "format": "float" },
+          "market_value": { "type": "number", "format": "float" },
+          "unrealized_pnl": { "type": "number", "format": "float" },
+          "last_price": { "type": "number", "format": "float" }
+        }
+      }
     }
   }
 }
