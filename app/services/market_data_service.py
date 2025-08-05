@@ -256,12 +256,33 @@ class MarketDataService:
         except Exception as e:
             db.session.rollback()
             print(f"Failed to update historical data for {asset.ticker_symbol}: {e}")
-
+    
     @staticmethod
-    def search_assets(query: str):
-        """Searches for assets by ticker or name in the local database."""
-        search = f"%{query}%"
-        assets = Asset.query.filter(
-            (Asset.ticker_symbol.ilike(search)) | (Asset.name.ilike(search))
-        ).limit(10).all()
-        return [{"ticker": a.ticker_symbol, "name": a.name} for a in assets]
+    def get_index_data():
+        """
+        Fetches the current price and daily change for major market indices.
+        """
+        index_tickers = {
+            "S&P 500": "^GSPC",
+            "Dow Jones": "^DJI",
+            "Nasdaq": "^IXIC",
+            "Russell 2000": "^RUT"
+        }
+        try:
+            tickers_str = " ".join(index_tickers.values())
+            data = yf.Tickers(tickers_str)
+            
+            index_data = []
+            for name, ticker in index_tickers.items():
+                info = data.tickers[ticker].info
+                if info and 'regularMarketPrice' in info:
+                    index_data.append({
+                        "name": name,
+                        "ticker": ticker,
+                        "price": info.get('regularMarketPrice'),
+                        "change_percent": info.get('regularMarketChangePercent', 0) * 100
+                    })
+            return index_data
+        except Exception as e:
+            print(f"Failed to fetch index data: {e}")
+            return []

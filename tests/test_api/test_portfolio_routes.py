@@ -1,7 +1,7 @@
 # tests/test_api/test_portfolio_routes.py
 
 from decimal import Decimal
-from app.models.models import User, Portfolio, Account, Asset, Holding
+from app.models.models import User, Portfolio, Account, Asset, Holding, AccountType
 
 def test_get_portfolio_summary_api(client, db):
     """
@@ -12,8 +12,8 @@ def test_get_portfolio_summary_api(client, db):
     # ARRANGE
     user = User(username="test", email="test@test.com", password_hash="123")
     portfolio = Portfolio(name="Test Portfolio", user=user)
-    cash_account = Account(name="Cash", account_type="CASH", balance=Decimal("5000.00"), portfolio=portfolio)
-    brokerage_account = Account(name="Brokerage", account_type="INVESTMENT", portfolio=portfolio)
+    cash_account = Account(name="Cash", account_type=AccountType.CASH, balance=Decimal("5000.00"), portfolio=portfolio)
+    brokerage_account = Account(name="Brokerage", account_type=AccountType.INVESTMENT, portfolio=portfolio)
     asset = Asset(ticker_symbol="AAPL", name="Apple Inc", last_price=Decimal("200.00"), previous_close_price=Decimal("190.00"))
     holding = Holding(account=brokerage_account, asset=asset, quantity=100, cost_basis=15000) # 100 shares
     db.session.add_all([user, portfolio, cash_account, brokerage_account, asset, holding])

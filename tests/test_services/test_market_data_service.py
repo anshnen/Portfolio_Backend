@@ -3,7 +3,7 @@
 import pytest
 from decimal import Decimal
 from app.services.market_data_service import MarketDataService
-from app.models.models import Asset
+from app.models.models import Asset, AssetType
 from tests.data.mock_api_data import MOCK_AAPL_DATA, MOCK_RELIANCE_DATA
 
 def test_find_or_create_asset_creates_new_asset(db, mocker):
@@ -44,7 +44,7 @@ def test_find_or_create_asset_finds_existing_asset(db, mocker):
     existing_asset = Asset(
         ticker_symbol="AAPL",
         name="Apple Inc",
-        asset_type="STOCK",
+        asset_type=AssetType.STOCK,
         last_price=Decimal("150.00")
     )
     db.session.add(existing_asset)
