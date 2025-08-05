@@ -43,7 +43,7 @@ def get_accounts_for_portfolio(portfolio_id):
     accounts_data = [{
         "id": acc.id,
         "name": acc.name,
-        "account_type": acc.account_type,
+        "account_type": acc.account_type.value,
         "balance": float(acc.balance)
     } for acc in accounts]
     return jsonify(accounts_data), 200
@@ -57,7 +57,7 @@ def manage_funds(account_id):
         return jsonify({"error": "Missing 'action' (DEPOSIT/WITHDRAWAL) or 'amount'"}), 400
 
     account = Account.query.get(account_id)
-    if not account or account.account_type != 'CASH':
+    if not account or account.account_type.value != 'CASH': # Compare with enum's value
         return jsonify({"error": "Funds can only be managed in a CASH account."}), 400
 
     action = data['action'].upper()

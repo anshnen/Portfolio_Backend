@@ -103,7 +103,7 @@ def get_portfolio_summary(portfolio_id: int):
             {
                 "id": acc.id,
                 "name": acc.name,
-                "account_type": acc.account_type,
+                "account_type": acc.account_type.value,
                 "balance": float(acc.balance) if acc.account_type == 'CASH' else float(sum(h.market_value for h in acc.holdings))
             } for acc in portfolio.accounts
         ],
