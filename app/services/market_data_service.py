@@ -266,7 +266,10 @@ class MarketDataService:
             "S&P 500": "^GSPC",
             "Dow Jones": "^DJI",
             "Nasdaq": "^IXIC",
-            "Russell 2000": "^RUT"
+            "Russell 2000": "^RUT",
+            "DAX": "^GDAXI",
+            "CAC 40": "^FCHI",
+            "FTSE 100": "^FTSE",
         }
         try:
             tickers_str = " ".join(index_tickers.values())

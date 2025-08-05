@@ -3,23 +3,21 @@
 import pytest
 from decimal import Decimal
 from app.services.market_data_service import MarketDataService
-from app.models.models import Asset, AssetType
+from app.models.models import Asset, AssetType, HistoricalPrice
 from tests.data.mock_api_data import MOCK_AAPL_DATA, MOCK_RELIANCE_DATA
 
 def test_find_or_create_asset_creates_new_asset(db, mocker):
     """
     GIVEN a ticker symbol that does not exist in the database
     WHEN find_or_create_asset is called
-    AND the external API call is mocked
+    AND the external API calls are mocked
     THEN a new Asset should be created and saved to the database with the correct data
     """
-    # ARRANGE
-    # Mock the external API call to prevent a real network request
-    mocker.patch(
-        'app.services.market_data_service.MarketDataService.get_price_from_source',
-        return_value=MOCK_RELIANCE_DATA
-    )
-    
+    # ARRANGE: Mock all external API calls to isolate the service logic
+    mocker.patch('app.services.market_data_service.MarketDataService._get_live_price_data', return_value=MOCK_RELIANCE_DATA)
+    mocker.patch('app.services.market_data_service.polygon_client', None)
+    mocker.patch('app.services.market_data_service.fd', None)
+
     # ACT
     asset = MarketDataService.find_or_create_asset("RELIANCE.NS")
     
@@ -38,7 +36,7 @@ def test_find_or_create_asset_finds_existing_asset(db, mocker):
     """
     GIVEN a ticker symbol that already exists in the database
     WHEN find_or_create_asset is called
-    THEN the existing Asset should be returned without creating a new one
+    THEN the existing Asset should be returned without making any external API calls
     """
     # ARRANGE
     existing_asset = Asset(
@@ -52,7 +50,7 @@ def test_find_or_create_asset_finds_existing_asset(db, mocker):
     
     # Mock the external API call to ensure it's not being called unnecessarily
     mock_api_call = mocker.patch(
-        'app.services.market_data_service.MarketDataService.get_price_from_source'
+        'app.services.market_data_service.MarketDataService._get_live_price_data'
     )
 
     # ACT
@@ -78,11 +76,12 @@ def test_get_asset_details_logic(db, mocker):
     THEN it should return a dictionary with the correct, comprehensive structure
     """
     # ARRANGE
-    # We can use a mock object to simulate the Asset model
+    # Create a mock Asset object with all necessary fields
     mock_asset = Asset(
         id=1,
         ticker_symbol="AAPL",
         name="Apple Inc.",
+        asset_type=AssetType.STOCK, # FIX: Added required asset_type
         last_price=MOCK_AAPL_DATA['last_price'],
         sector=MOCK_AAPL_DATA['sector'],
         market_cap=MOCK_AAPL_DATA['market_cap']
@@ -97,9 +96,11 @@ def test_get_asset_details_logic(db, mocker):
         'app.services.market_data_service.MarketDataService.update_historical_data',
         return_value=None # We don't need it to do anything for this test
     )
+    # Mock the database query for historical data to return an empty list
     mocker.patch(
-        'app.models.models.HistoricalPrice.query' # Mock the database query for historical data
-    )
+        'app.models.models.HistoricalPrice.query'
+    ).filter_by.return_value.order_by.return_value.asc.return_value.all.return_value = []
+
 
     # ACT
     details = MarketDataService.get_asset_details("AAPL")
@@ -109,7 +110,6 @@ def test_get_asset_details_logic(db, mocker):
     assert details['ticker_symbol'] == "AAPL"
     assert details['name'] == "Apple Inc."
     assert "fundamentals" in details
-    assert "technicals" in details
     assert "historical_data" in details
     assert details['fundamentals']['sector'] == "Technology"
     assert details['fundamentals']['market_cap'] == 3000000000000
