@@ -7,11 +7,6 @@ from datetime import datetime
 import enum
 
 # --- Enums for Data Integrity ---
-class AccountType(enum.Enum):
-    CASH = "CASH"
-    INVESTMENT = "INVESTMENT"
-    RETIREMENT = "RETIREMENT"
-
 class AssetType(enum.Enum):
     STOCK = "STOCK"
     ETF = "ETF"
@@ -66,8 +61,8 @@ class Account(db.Model):
     __tablename__ = 'accounts'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
-    account_type = db.Column(db.Enum(AccountType), nullable=False)
-    institution = db.Column(db.String(100))
+    
+    
     balance = db.Column(db.Numeric(15, 2), default=0.00)
     portfolio_id = db.Column(db.Integer, db.ForeignKey('portfolios.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -91,23 +86,25 @@ class Asset(db.Model):
     name = db.Column(db.String(100), nullable=False)
     asset_type = db.Column(db.Enum(AssetType), nullable=False)
     
+    # --- Data from Tiingo/Twelve Data ---
+    description = db.Column(db.Text)
+    exchange_code = db.Column(db.String(50))
+    list_date = db.Column(db.Date)
+    
+    # --- Price Data ---
     last_price = db.Column(db.Numeric(15, 4))
     previous_close_price = db.Column(db.Numeric(15, 4))
     price_updated_at = db.Column(db.DateTime)
     
-    market_cap = db.Column(db.BigInteger)
-    sector = db.Column(db.String(100))
-    pe_ratio = db.Column(db.Numeric(10, 2))
-    eps = db.Column(db.Numeric(10, 2))
-    dividend_yield = db.Column(db.Numeric(10, 4))
-
+    # --- Relationships ---
     historical_prices = relationship('HistoricalPrice', back_populates='asset', cascade="all, delete-orphan")
     watchlist_items = relationship('WatchlistItem', back_populates='asset', cascade="all, delete-orphan")
     holdings = relationship('Holding', back_populates='asset')
     transactions = relationship('Transaction', back_populates='asset')
-
+    
     def __repr__(self):
         return f"<Asset(id={self.id}, ticker='{self.ticker_symbol}')>"
+
 
 class Holding(db.Model):
     __tablename__ = 'holdings'

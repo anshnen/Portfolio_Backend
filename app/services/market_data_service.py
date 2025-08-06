@@ -41,12 +41,7 @@ class MarketDataService:
                 return {
                     "name": info.get('longName'),
                     "last_price": safe_decimal(info.get('currentPrice')),
-                    "previous_close": safe_decimal(info.get('previousClose')),
-                    "market_cap": safe_int(info.get('marketCap')),
-                    "sector": info.get('sector'),
-                    "pe_ratio": safe_decimal(info.get('trailingPE')),
-                    "eps": safe_decimal(info.get('trailingEps')),
-                    "dividend_yield": safe_decimal(info.get('dividendYield'))
+                    "previous_close": safe_decimal(info.get('previousClose'))
                 }
         except Exception as e:
             print(f"yfinance failed for {ticker}: {e}")
@@ -62,10 +57,12 @@ class MarketDataService:
 
         print(f"Asset '{ticker}' not in DB. Fetching from external APIs...")
         try:
+            # 1. Fetch primary price data from yfinance
             yfinance_data = MarketDataService._get_yfinance_data(ticker)
             if not yfinance_data:
                 raise ValueError(f"Could not find valid data for {ticker} from yfinance.")
 
+            # 2. Fetch supplemental metadata from Tiingo
             tiingo_meta = {}
             if tiingo_client:
                 try:
@@ -73,19 +70,16 @@ class MarketDataService:
                 except Exception as e:
                     print(f"Could not fetch Tiingo metadata for {ticker}: {e}")
             
+            # Create the asset with the streamlined data
             asset = Asset(
                 ticker_symbol=ticker,
                 name=yfinance_data['name'],
                 asset_type=AssetType.STOCK,
                 description=tiingo_meta.get('description'),
                 exchange_code=tiingo_meta.get('exchangeCode'),
+                list_date=datetime.strptime(tiingo_meta['startDate'], '%Y-%m-%d').date() if tiingo_meta.get('startDate') else None,
                 last_price=yfinance_data['last_price'],
                 previous_close_price=yfinance_data['previous_close'],
-                market_cap=yfinance_data['market_cap'],
-                sector=yfinance_data['sector'],
-                pe_ratio=yfinance_data['pe_ratio'],
-                eps=yfinance_data['eps'],
-                dividend_yield=yfinance_data['dividend_yield'],
                 price_updated_at=datetime.utcnow()
             )
             db.session.add(asset)
@@ -95,42 +89,6 @@ class MarketDataService:
         except Exception as e:
             db.session.rollback()
             raise ValueError(f"Could not fetch or create asset for {ticker}: {e}")
-
-    @staticmethod
-    def update_all_asset_details():
-        """
-        Fetches and updates the full details (fundamentals, metadata) for all
-        existing assets in the database.
-        """
-        assets_to_update = Asset.query.filter(Asset.asset_type.in_([AssetType.STOCK, AssetType.ETF])).all()
-        if not assets_to_update:
-            print("No assets found for detail update.")
-            return
-
-        for asset in assets_to_update:
-            print(f"Updating full details for {asset.ticker_symbol}...")
-            try:
-                if tiingo_client:
-                    tiingo_meta = tiingo_client.get_ticker_metadata(asset.ticker_symbol)
-                    if tiingo_meta:
-                        asset.description = tiingo_meta.get('description', asset.description)
-                        asset.exchange_code = tiingo_meta.get('exchangeCode', asset.exchange_code)
-                
-                yfinance_data = MarketDataService._get_yfinance_data(asset.ticker_symbol)
-                if yfinance_data:
-                    asset.name = yfinance_data.get('name', asset.name)
-                    asset.market_cap = yfinance_data.get('market_cap', asset.market_cap)
-                    asset.sector = yfinance_data.get('sector', asset.sector)
-                    asset.pe_ratio = yfinance_data.get('pe_ratio', asset.pe_ratio)
-                    asset.eps = yfinance_data.get('eps', asset.eps)
-                    asset.dividend_yield = yfinance_data.get('dividend_yield', asset.dividend_yield)
-
-                db.session.commit()
-                print(f"Successfully updated details for {asset.ticker_symbol}.")
-                time.sleep(1) # Add a small delay to be respectful to APIs
-            except Exception as e:
-                print(f"Could not update details for {asset.ticker_symbol}: {e}")
-                db.session.rollback()
 
     @staticmethod
     def update_asset_prices():
@@ -156,7 +114,7 @@ class MarketDataService:
 
     @staticmethod
     def get_asset_details(ticker: str):
-        """Gets detailed fundamental and historical data for an asset."""
+        """Gets detailed and historical data for an asset."""
         asset = MarketDataService.find_or_create_asset(ticker)
         
         MarketDataService.update_historical_data(asset.id)
@@ -169,13 +127,9 @@ class MarketDataService:
             "name": asset.name,
             "description": asset.description,
             "exchange": asset.exchange_code,
+            "list_date": asset.list_date.isoformat() if asset.list_date else None,
             "last_price": float(asset.last_price) if asset.last_price is not None else 0.0,
             "previous_close_price": float(asset.previous_close_price) if asset.previous_close_price is not None else 0.0,
-            "market_cap": asset.market_cap,
-            "sector": asset.sector,
-            "pe_ratio": float(asset.pe_ratio) if asset.pe_ratio is not None else 0.0,
-            "eps": float(asset.eps) if asset.eps is not None else 0.0,
-            "dividend_yield": float(asset.dividend_yield) if asset.dividend_yield is not None else 0.0,
             "historical_data": [{"date": h.price_date.isoformat(), "close": float(h.close_price)} for h in historical_data]
         }
 
@@ -213,7 +167,6 @@ class MarketDataService:
                     )
                     db.session.add(new_price)
             db.session.commit()
-            time.sleep(8) # Respect Twelve Data rate limit
         except Exception as e:
             db.session.rollback()
             print(f"Failed to update historical data for {asset.ticker_symbol}: {e}")
@@ -229,10 +182,9 @@ class MarketDataService:
 
     @staticmethod
     def get_index_data():
-        """Fetches the current price and daily change for major market indices."""
+        """Fetches the current price and daily change for major market indices using yfinance."""
         index_tickers = {
             "S&P 500": "^GSPC", "Dow Jones": "^DJI", "Nasdaq": "^IXIC",
-            "Russell 2000": "^RUT", "DAX": "^GDAXI", "CAC 40": "^FCHI", "FTSE 100": "^FTSE"
         }
         try:
             tickers_str = " ".join(index_tickers.values())
@@ -251,3 +203,39 @@ class MarketDataService:
         except Exception as e:
             print(f"Failed to fetch index data: {e}")
             return []
+    
+    @staticmethod
+    def update_all_asset_details():
+        """
+        Fetches and updates the full details (fundamentals, metadata) for all
+        existing assets in the database.
+        """
+        assets_to_update = Asset.query.filter(Asset.asset_type.in_([AssetType.STOCK, AssetType.ETF])).all()
+        if not assets_to_update:
+            print("No assets found for detail update.")
+            return
+
+        for asset in assets_to_update:
+            print(f"Updating full details for {asset.ticker_symbol}...")
+            try:
+                if tiingo_client:
+                    tiingo_meta = tiingo_client.get_ticker_metadata(asset.ticker_symbol)
+                    if tiingo_meta:
+                        asset.description = tiingo_meta.get('description', asset.description)
+                        asset.exchange_code = tiingo_meta.get('exchangeCode', asset.exchange_code)
+                
+                yfinance_data = MarketDataService._get_yfinance_data(asset.ticker_symbol)
+                if yfinance_data:
+                    asset.name = yfinance_data.get('name', asset.name)
+                    asset.last_price = yfinance_data.get('last_price', asset.last_price)
+                    asset.previous_close_price = yfinance_data.get('previous_close', asset.previous_close_price)
+                    
+                    asset.eps = yfinance_data.get('eps', asset.eps)
+                    asset.dividend_yield = yfinance_data.get('dividend_yield', asset.dividend_yield)
+
+                db.session.commit()
+                print(f"Successfully updated details for {asset.ticker_symbol}.")
+                time.sleep(1) # Add a small delay to be respectful to APIs
+            except Exception as e:
+                print(f"Could not update details for {asset.ticker_symbol}: {e}")
+                db.session.rollback()

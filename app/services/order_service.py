@@ -6,24 +6,19 @@ from decimal import Decimal
 from datetime import date
 
 class OrderService:
-    BROKERAGE_FEE = Decimal('1.00') # A flat $1.00 commission per trade
+    BROKERAGE_FEE = Decimal('1.00')
 
     @staticmethod
     def place_order(user_id: int, order_data: dict):
-        """Processes a buy or sell order with advanced logic."""
-        # --- 1. Validation ---
         required = ['account_id', 'ticker', 'quantity', 'order_type', 'transaction_type']
         if not all(field in order_data for field in required):
             raise ValueError(f"Missing required fields: {', '.join(required)}")
 
         order_type = order_data['order_type'].upper()
         if order_type not in ['MARKET', 'LIMIT', 'STOP_LOSS']:
-            raise ValueError("Invalid order_type. Must be 'MARKET', 'LIMIT', or 'STOP_LOSS'.")
+            raise ValueError("Invalid order_type.")
         
         transaction_type_str = order_data['transaction_type'].upper()
-        if transaction_type_str not in ['BUY', 'SELL']:
-            raise ValueError("Invalid transaction_type. Must be 'BUY' or 'SELL'.")
-        # FIX: Convert the string from the API into a TransactionType enum member
         transaction_type = TransactionType[transaction_type_str]
 
         account = db.session.get(Account, order_data['account_id'])
@@ -35,10 +30,8 @@ class OrderService:
         asset = MarketDataService.find_or_create_asset(order_data['ticker'])
         current_price = asset.last_price
         if not current_price or current_price <= 0:
-            # FIX: Removed stray object from the error message for clarity.
             raise ValueError(f"Could not retrieve a valid market price for {asset.ticker_symbol}.")
 
-        # --- 2. Handle Pending Orders (LIMIT, STOP_LOSS) ---
         if order_type in ['LIMIT', 'STOP_LOSS']:
             trigger_price = Decimal(str(order_data.get('trigger_price', 0)))
             if trigger_price <= 0:
@@ -48,14 +41,13 @@ class OrderService:
                 account_id=account.id, asset_id=asset.id, transaction_type=transaction_type,
                 status=TransactionStatus.PENDING, order_type=order_type, trigger_price=trigger_price,
                 transaction_date=date.today(), quantity=quantity,
-                total_amount=-(quantity * trigger_price), # Estimated amount
+                total_amount=-(quantity * trigger_price),
                 description=f"Pending {order_type} {transaction_type.value} for {quantity} shares of {asset.ticker_symbol} at ${trigger_price}"
             )
             db.session.add(pending_order)
             db.session.commit()
             return pending_order
 
-        # --- 3. Execute MARKET Order ---
         total_value = quantity * current_price
         
         transaction = Transaction(

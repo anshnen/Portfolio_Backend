@@ -3,13 +3,12 @@
 from datetime import date, timedelta
 from decimal import Decimal
 from sqlalchemy import func, case
-from ..models.models import db, Portfolio, Account, Holding, Transaction, AccountType
+from ..models.models import db, Portfolio, Account, Holding, Transaction
 from .market_data_service import MarketDataService
 
 def get_detailed_holdings(portfolio_id: int):
     """
-    Retrieves a detailed list of all individual holdings for a portfolio,
-    including calculated metrics like market value and unrealized P&L.
+    Retrieves a detailed list of all individual holdings for a portfolio.
     """
     holdings = Holding.query.join(Account).filter(Account.portfolio_id == portfolio_id).all()
     if not holdings:
@@ -43,48 +42,37 @@ def get_total_holdings_value(portfolio_id: int):
 
 def get_portfolio_summary(portfolio_id: int):
     """
-    Calculates a full summary for a given portfolio, including P&L,
-    market indices, a detailed holdings breakdown, and other advanced insights.
+    Calculates a full summary for a given portfolio, assuming a single account model.
     """
     portfolio = db.session.get(Portfolio, portfolio_id)
     if not portfolio:
         return None, "Portfolio not found"
 
-    # --- Initialize metrics ---
-    net_worth = Decimal('0.0')
+    # --- Simplified Single-Account Logic ---
+    account = portfolio.accounts[0] if portfolio.accounts else None
+    if not account:
+        return None, "No account found for this portfolio."
+
+    # --- Calculate Core Metrics from the Single Account ---
+    total_holdings_value = account.holdings_market_value
+    net_worth = account.balance + total_holdings_value
+    total_initial_investment = sum(h.cost_basis for h in account.holdings)
+    
+    overall_pl = total_holdings_value - total_initial_investment
+    overall_pl_percent = (overall_pl / total_initial_investment) * 100 if total_initial_investment > 0 else Decimal('0.0')
+
+    # --- Calculate Insights based on all holdings in the portfolio ---
     total_todays_change = Decimal('0.0')
     total_yesterday_value = Decimal('0.0')
-    total_initial_investment = Decimal('0.0')
-    total_holdings_value = Decimal('0.0')
-    
-    holdings_details = []
     daily_movers = []
     sector_allocation = {}
-
-    holdings = Holding.query.join(Account).filter(Account.portfolio_id == portfolio_id).all()
-
-    for holding in holdings:
-        market_value = holding.market_value
-        total_holdings_value += market_value
-        total_initial_investment += holding.cost_basis
-        net_worth += market_value
-
-        # --- Calculate individual P&L for each holding ---
-        unrealized_pnl = market_value - holding.cost_basis
-        
-        holdings_details.append({
-            "ticker_symbol": holding.asset.ticker_symbol,
-            "asset_name": holding.asset.name,
-            "quantity": float(holding.quantity),
-            "average_buy_price": float(holding.average_price),
-            "current_price": float(holding.asset.last_price) if holding.asset.last_price else None,
-            "market_value": float(market_value),
-            "unrealized_pnl": float(unrealized_pnl)
-        })
-
+    
+    all_holdings = Holding.query.join(Account).filter(Account.portfolio_id == portfolio_id).all()
+    for holding in all_holdings:
         if holding.asset and holding.asset.last_price and holding.asset.previous_close_price:
             change_for_holding = (holding.asset.last_price - holding.asset.previous_close_price) * holding.quantity
             total_todays_change += change_for_holding
+            
             yesterday_holding_value = holding.asset.previous_close_price * holding.quantity
             total_yesterday_value += yesterday_holding_value
             
@@ -95,19 +83,10 @@ def get_portfolio_summary(portfolio_id: int):
                 "change_amount": float(change_for_holding),
                 "percent_change": float(percent_change)
             })
-
+        
         sector = holding.asset.sector or "Other"
         sector_allocation.setdefault(sector, Decimal('0.0'))
-        sector_allocation[sector] += market_value
-
-    # Add cash balances to net worth
-    cash_accounts = Account.query.filter_by(portfolio_id=portfolio_id, account_type=AccountType.CASH).all()
-    for account in cash_accounts:
-        net_worth += account.balance
-
-    # --- Calculate Overall P&L Metrics ---
-    overall_pl = total_holdings_value - total_initial_investment
-    overall_pl_percent = (overall_pl / total_initial_investment) * 100 if total_initial_investment > 0 else Decimal('0.0')
+        sector_allocation[sector] += holding.market_value
 
     # --- Fetch Market Index Data ---
     market_indices = MarketDataService.get_index_data()
@@ -147,15 +126,12 @@ def get_portfolio_summary(portfolio_id: int):
             "todays_change_amount": float(total_todays_change),
         },
         "market_indices": market_indices,
-        "detailed_holdings": holdings_details,
-        "accounts": [
-            {
-                "id": acc.id,
-                "name": acc.name,
-                "account_type": acc.account_type.value,
-                "balance": float(acc.balance + acc.holdings_market_value)
-            } for acc in portfolio.accounts
-        ],
+        "detailed_holdings": get_detailed_holdings(portfolio_id)[0],
+        "account": {
+            "id": account.id,
+            "name": account.name,
+            "cash_balance": float(account.balance)
+        },
         "insights": {
             "top_gainers": top_gainers,
             "top_losers": top_losers,
