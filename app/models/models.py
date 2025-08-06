@@ -68,7 +68,7 @@ class Account(db.Model):
     name = db.Column(db.String(100), nullable=False)
     account_type = db.Column(db.Enum(AccountType), nullable=False)
     institution = db.Column(db.String(100))
-    balance = db.Column(db.Numeric(15, 2), default=0.00) # For CASH accounts, this is the total. For others, it's the cash portion.
+    balance = db.Column(db.Numeric(15, 2), default=0.00)
     portfolio_id = db.Column(db.Integer, db.ForeignKey('portfolios.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -79,7 +79,6 @@ class Account(db.Model):
 
     @property
     def holdings_market_value(self):
-        """Calculates the total market value of all assets held in this account."""
         return sum(holding.market_value for holding in self.holdings)
 
     def __repr__(self):
@@ -92,32 +91,20 @@ class Asset(db.Model):
     name = db.Column(db.String(100), nullable=False)
     asset_type = db.Column(db.Enum(AssetType), nullable=False)
     
-    # --- Detailed fields from Polygon.io ---
-    description = db.Column(db.Text)
-    homepage_url = db.Column(db.String(255))
-    sic_description = db.Column(db.String(255)) # Industry classification
-    list_date = db.Column(db.Date)
-    market = db.Column(db.String(50))
-    locale = db.Column(db.String(20))
-    primary_exchange = db.Column(db.String(50))
-    total_employees = db.Column(db.Integer)
-    share_class_shares_outstanding = db.Column(db.BigInteger)
-    
-    # --- Price Data ---
     last_price = db.Column(db.Numeric(15, 4))
     previous_close_price = db.Column(db.Numeric(15, 4))
     price_updated_at = db.Column(db.DateTime)
     
-    # --- Fundamental Data ---
     market_cap = db.Column(db.BigInteger)
-    sector = db.Column(db.String(100)) # Can be derived from sic_description
+    sector = db.Column(db.String(100))
     pe_ratio = db.Column(db.Numeric(10, 2))
     eps = db.Column(db.Numeric(10, 2))
     dividend_yield = db.Column(db.Numeric(10, 4))
-    
-    # --- Relationships ---
+
     historical_prices = relationship('HistoricalPrice', back_populates='asset', cascade="all, delete-orphan")
     watchlist_items = relationship('WatchlistItem', back_populates='asset', cascade="all, delete-orphan")
+    holdings = relationship('Holding', back_populates='asset')
+    transactions = relationship('Transaction', back_populates='asset')
 
     def __repr__(self):
         return f"<Asset(id={self.id}, ticker='{self.ticker_symbol}')>"
@@ -133,7 +120,7 @@ class Holding(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     account = relationship('Account', back_populates='holdings')
-    asset = relationship('Asset')
+    asset = relationship('Asset', back_populates='holdings')
     
     @property
     def market_value(self):
@@ -167,7 +154,7 @@ class Transaction(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     account = relationship('Account', back_populates='transactions')
-    asset = relationship('Asset')
+    asset = relationship('Asset', back_populates='transactions')
 
     def __repr__(self):
         return f"<Transaction(id={self.id}, type='{self.transaction_type.value}', amount={self.total_amount})>"

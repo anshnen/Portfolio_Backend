@@ -58,13 +58,12 @@ def run_seed():
         
         assets = {}
         for ticker, name in asset_data.items():
+            # FIX: Use the correct Enum types
+            asset_type = AssetType.CASH if ticker == 'CASH' else AssetType.STOCK
+            asset = Asset(ticker_symbol=ticker, name=name, asset_type=asset_type)
             if ticker == 'CASH':
-                asset = Asset(ticker_symbol=ticker, name=name, asset_type=AssetType.CASH, last_price=Decimal('1.00'), previous_close_price=Decimal('1.00'))
-            else:
-                # Add realistic, hardcoded prices to reduce initial API dependency
-                price = Decimal(random.uniform(50, 550))
-                prev_close = price * Decimal(random.uniform(0.98, 1.02)) # +/- 2% change
-                asset = Asset(ticker_symbol=ticker, name=name, asset_type=AssetType.STOCK, last_price=price, previous_close_price=prev_close)
+                asset.last_price = Decimal('1.00')
+                asset.previous_close_price = Decimal('1.00')
             assets[ticker] = asset
             
         db.session.add_all(assets.values())
@@ -73,9 +72,9 @@ def run_seed():
 
         # --- 5. Create Accounts ---
         accounts = {
-            'cash': Account(portfolio_id=portfolio.id, name='Primary Cash Account', account_type=AccountType.CASH, balance=Decimal('75000.00')),
-            'brokerage': Account(portfolio_id=portfolio.id, name='Main Brokerage Account', account_type=AccountType.INVESTMENT),
-            'roth_ira': Account(portfolio_id=portfolio.id, name='Roth IRA', account_type=AccountType.RETIREMENT)
+            'cash': Account(portfolio_id=portfolio.id, name='Primary Cash Account', institution="Bank of America", account_type=AccountType.CASH, balance=Decimal('75000.00')),
+            'brokerage': Account(portfolio_id=portfolio.id, name='Main Brokerage Account', institution="Fidelity", account_type=AccountType.INVESTMENT),
+            'roth_ira': Account(portfolio_id=portfolio.id, name='Roth IRA', institution="Vanguard", account_type=AccountType.RETIREMENT)
         }
         db.session.add_all(accounts.values())
         db.session.commit()
@@ -87,31 +86,37 @@ def run_seed():
         transactions_to_add = []
         
         yesterday = date.today() - timedelta(days=1)
-        start_date = yesterday - timedelta(days=2 * 365) # 2 years of history
+        start_date = yesterday - timedelta(days=2 * 365)
         
         initial_deposit = Transaction(account_id=accounts['cash'].id, transaction_type=TransactionType.DEPOSIT, transaction_date=start_date, total_amount=Decimal('75000'), description='Initial capital deposit')
         transactions_to_add.append(initial_deposit)
 
-        for i in range(50): # Generate ~50 core financial events
+        for i in range(50):
             random_date = start_date + timedelta(days=random.randint(1, (yesterday - start_date).days))
-            event_type = random.choice(['TRADE', 'TRADE', 'TRADE', 'DIVIDEND']) # More focus on trading
+            event_type = random.choice(['TRADE', 'TRADE', 'TRADE', 'DIVIDEND'])
 
             if event_type == 'TRADE':
-                trade_type = 'BUY'
                 ticker_to_trade = random.choice([t for t in assets if t != 'CASH'])
                 asset_id = assets[ticker_to_trade].id
                 
-                if trade_type == 'BUY':
-                    quantity = Decimal(random.randint(5, 25))
-                    price = assets[ticker_to_trade].last_price * Decimal(random.uniform(0.8, 1.0)) # Simulate buying at a past, lower price
-                    total_cost = quantity * price
-                    if accounts['cash'].balance >= total_cost:
-                        accounts['cash'].balance -= total_cost
-                        if asset_id not in holdings:
-                            holdings[asset_id] = {'quantity': Decimal(0), 'cost_basis': Decimal(0), 'account_id': accounts['brokerage'].id}
-                        holdings[asset_id]['quantity'] += quantity
-                        holdings[asset_id]['cost_basis'] += total_cost
-                        transactions_to_add.append(Transaction(account_id=accounts['brokerage'].id, asset_id=asset_id, transaction_type=TransactionType.BUY, transaction_date=random_date, quantity=quantity, price_per_unit=price, total_amount=-total_cost, description=f'Market buy of {ticker_to_trade}'))
+                quantity = Decimal(random.randint(5, 25))
+                # Use a placeholder price for seeding; real prices will be updated later
+                price = Decimal(random.uniform(50, 550))
+                total_cost = quantity * price
+                if accounts['cash'].balance >= total_cost:
+                    accounts['cash'].balance -= total_cost
+                    if asset_id not in holdings:
+                        holdings[asset_id] = {'quantity': Decimal(0), 'cost_basis': Decimal(0), 'account_id': accounts['brokerage'].id}
+                    holdings[asset_id]['quantity'] += quantity
+                    holdings[asset_id]['cost_basis'] += total_cost
+                    transactions_to_add.append(Transaction(account_id=accounts['brokerage'].id, asset_id=asset_id, transaction_type=TransactionType.BUY, transaction_date=random_date, quantity=quantity, price_per_unit=price, total_amount=-total_cost, description=f'Market buy of {ticker_to_trade}'))
+
+            elif event_type == 'DIVIDEND' and holdings:
+                asset_id_to_receive_dividend = random.choice(list(holdings.keys()))
+                ticker = next(t for t, a in assets.items() if a.id == asset_id_to_receive_dividend)
+                dividend_amount = holdings[asset_id_to_receive_dividend]['quantity'] * Decimal(random.uniform(0.1, 1.5))
+                accounts['cash'].balance += dividend_amount
+                transactions_to_add.append(Transaction(account_id=accounts['cash'].id, asset_id=asset_id_to_receive_dividend, transaction_type=TransactionType.DIVIDEND, transaction_date=random_date, total_amount=dividend_amount, description=f'Dividend from {ticker}'))
 
         db.session.add_all(transactions_to_add)
         print(f"Generated {len(transactions_to_add)} transactions.")
