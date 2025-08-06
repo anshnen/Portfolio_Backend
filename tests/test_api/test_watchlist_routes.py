@@ -17,7 +17,7 @@ def test_create_and_get_watchlist_api(client, db):
 
     # ACT (Create)
     create_payload = {"portfolio_id": portfolio.id, "name": "My Tech Stocks"}
-    create_response = client.post('/api/v1/watchlists', json=create_payload)
+    create_response = client.post('/api/v1/watchlists/', json=create_payload)
     create_json = create_response.get_json()
 
     # ASSERT (Create)
@@ -60,11 +60,13 @@ def test_add_and_remove_item_from_watchlist_api(client, db, mocker):
     # ASSERT (Add)
     assert add_response.status_code == 201
     assert WatchlistItem.query.count() == 1
-
+    item_in_db = WatchlistItem.query.filter_by(watchlist_id=watchlist.id, ticker_symbol="AAPL").first()
+    assert item_in_db is not None  # The item should exist after adding
     # ACT (Remove)
     # The endpoint for removal uses the ticker symbol, not the asset_id
     remove_response = client.delete(f'/api/v1/watchlists/{watchlist.id}/items/AAPL')
 
     # ASSERT (Remove)
-    assert remove_response.status_code == 200
     assert WatchlistItem.query.count() == 0
+
+    assert remove_response.status_code == 200
