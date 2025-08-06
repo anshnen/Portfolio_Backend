@@ -65,7 +65,6 @@ def get_portfolio_summary(portfolio_id: int):
     total_todays_change = Decimal('0.0')
     total_yesterday_value = Decimal('0.0')
     daily_movers = []
-    sector_allocation = {}
     
     all_holdings = Holding.query.join(Account).filter(Account.portfolio_id == portfolio_id).all()
     for holding in all_holdings:
@@ -83,10 +82,6 @@ def get_portfolio_summary(portfolio_id: int):
                 "change_amount": float(change_for_holding),
                 "percent_change": float(percent_change)
             })
-        
-        sector = holding.asset.sector or "Other"
-        sector_allocation.setdefault(sector, Decimal('0.0'))
-        sector_allocation[sector] += holding.market_value
 
     # --- Fetch Market Index Data ---
     market_indices = MarketDataService.get_index_data()
@@ -95,12 +90,6 @@ def get_portfolio_summary(portfolio_id: int):
     daily_movers.sort(key=lambda x: x['change_amount'], reverse=True)
     top_gainers = daily_movers[:5]
     top_losers = sorted([mover for mover in daily_movers if mover['change_amount'] < 0], key=lambda x: x['change_amount'])[:5]
-
-    # --- Finalize Sector Allocation Percentages ---
-    sector_allocation_percent = {
-        sector: float((value / total_holdings_value) * 100) if total_holdings_value > 0 else 0
-        for sector, value in sector_allocation.items()
-    }
 
     # --- Calculate Cash Flow for the Last 30 Days ---
     thirty_days_ago = date.today() - timedelta(days=30)
@@ -134,8 +123,7 @@ def get_portfolio_summary(portfolio_id: int):
         },
         "insights": {
             "top_gainers": top_gainers,
-            "top_losers": top_losers,
-            "sector_allocation": sector_allocation_percent
+            "top_losers": top_losers
         }
     }
 
