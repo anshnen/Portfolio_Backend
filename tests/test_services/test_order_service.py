@@ -3,21 +3,22 @@
 import pytest
 from decimal import Decimal
 from app.services.order_service import OrderService
-from app.models.models import User, Portfolio, Account, Asset, Holding, TransactionStatus
+from app.models.models import User, Portfolio, Account, Asset, Holding, TransactionStatus, AccountType, AssetType
 from tests.data.mock_api_data import MOCK_AAPL_DATA
 
 def test_place_market_buy_order_success(db):
     """
     GIVEN a user with sufficient funds
     WHEN a valid MARKET BUY order is placed via the OrderService
-    THEN a new holding should be created, and the cash balance should be reduced correctly
+    THEN a new holding should be created and the cash balance should be reduced correctly
     """
     # ARRANGE: Set up the initial state in the test database
     user = User(username="test", email="test@test.com", password_hash="123")
     portfolio = Portfolio(name="Test Portfolio", user=user)
-    cash_account = Account(name="Cash", account_type="CASH", balance=Decimal("10000"), portfolio=portfolio)
-    brokerage_account = Account(name="Brokerage", account_type="INVESTMENT", portfolio=portfolio)
-    asset = Asset(ticker_symbol="AAPL", name="Apple Inc", last_price=MOCK_AAPL_DATA['last_price'])
+    cash_account = Account(name="Cash", account_type=AccountType.CASH, balance=Decimal("10000"), portfolio=portfolio)
+    brokerage_account = Account(name="Brokerage", account_type=AccountType.INVESTMENT, portfolio=portfolio)
+    # FIX: Added the required 'asset_type' field.
+    asset = Asset(ticker_symbol="AAPL", name="Apple Inc", asset_type=AssetType.STOCK, last_price=MOCK_AAPL_DATA['last_price'])
     db.session.add_all([user, portfolio, cash_account, brokerage_account, asset])
     db.session.commit()
 
@@ -50,9 +51,10 @@ def test_place_market_sell_order_success(db):
     # ARRANGE
     user = User(username="test", email="test@test.com", password_hash="123")
     portfolio = Portfolio(name="Test Portfolio", user=user)
-    cash_account = Account(name="Cash", account_type="CASH", balance=Decimal("10000"), portfolio=portfolio)
-    brokerage_account = Account(name="Brokerage", account_type="INVESTMENT", portfolio=portfolio)
-    asset = Asset(ticker_symbol="AAPL", name="Apple Inc", last_price=Decimal("200.00"))
+    cash_account = Account(name="Cash", account_type=AccountType.CASH, balance=Decimal("10000"), portfolio=portfolio)
+    brokerage_account = Account(name="Brokerage", account_type=AccountType.INVESTMENT, portfolio=portfolio)
+    # FIX: Added the required 'asset_type' field.
+    asset = Asset(ticker_symbol="AAPL", name="Apple Inc", asset_type=AssetType.STOCK, last_price=Decimal("200.00"))
     holding = Holding(account=brokerage_account, asset=asset, quantity=50, cost_basis=Decimal("7500")) # Avg price = 150
     db.session.add_all([user, portfolio, cash_account, brokerage_account, asset, holding])
     db.session.commit()
@@ -78,9 +80,10 @@ def test_place_buy_order_insufficient_funds(db):
     # ARRANGE
     user = User(username="test", email="test@test.com", password_hash="123")
     portfolio = Portfolio(name="Test Portfolio", user=user)
-    cash_account = Account(name="Cash", account_type="CASH", balance=Decimal("100.00"), portfolio=portfolio)
-    brokerage_account = Account(name="Brokerage", account_type="INVESTMENT", portfolio=portfolio)
-    asset = Asset(ticker_symbol="AAPL", name="Apple Inc", last_price=MOCK_AAPL_DATA['last_price'])
+    cash_account = Account(name="Cash", account_type=AccountType.CASH, balance=Decimal("100.00"), portfolio=portfolio)
+    brokerage_account = Account(name="Brokerage", account_type=AccountType.INVESTMENT, portfolio=portfolio)
+    # FIX: Added the required 'asset_type' field.
+    asset = Asset(ticker_symbol="AAPL", name="Apple Inc", asset_type=AssetType.STOCK, last_price=MOCK_AAPL_DATA['last_price'])
     db.session.add_all([user, portfolio, cash_account, brokerage_account, asset])
     db.session.commit()
 
@@ -99,8 +102,9 @@ def test_place_limit_buy_order(db):
     # ARRANGE
     user = User(username="test", email="test@test.com", password_hash="123")
     portfolio = Portfolio(name="Test Portfolio", user=user)
-    brokerage_account = Account(name="Brokerage", account_type="INVESTMENT", portfolio=portfolio)
-    asset = Asset(ticker_symbol="GOOGL", name="Alphabet Inc.", last_price=Decimal("170.00"))
+    brokerage_account = Account(name="Brokerage", account_type=AccountType.INVESTMENT, portfolio=portfolio)
+    # FIX: Added the required 'asset_type' field.
+    asset = Asset(ticker_symbol="GOOGL", name="Alphabet Inc.", asset_type=AssetType.STOCK, last_price=Decimal("170.00"))
     db.session.add_all([user, portfolio, brokerage_account, asset])
     db.session.commit()
 

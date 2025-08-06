@@ -8,30 +8,24 @@ def get_all_watchlists(portfolio_id: int):
     watchlists = Watchlist.query.filter_by(portfolio_id=portfolio_id).all()
     result = []
     for wl in watchlists:
-        items = []
-        for item in wl.items:
-            asset = item.asset
-            items.append({
-                "asset_id": asset.id,
-                "ticker_symbol": asset.ticker_symbol,
-                "name": asset.name,
-                "last_price": float(asset.last_price) if asset.last_price else None
-            })
-        result.append({
-            "id": wl.id,
-            "name": wl.name,
-            "items": items
-        })
+        items = [
+            {
+                "asset_id": item.asset.id,
+                "ticker_symbol": item.asset.ticker_symbol,
+                "name": item.asset.name,
+                "last_price": float(item.asset.last_price) if item.asset.last_price else None
+            } for item in wl.items
+        ]
+        result.append({ "id": wl.id, "name": wl.name, "items": items })
     return result
 
 def create_watchlist(portfolio_id: int, name: str):
     """Creates a new, empty watchlist."""
-    portfolio = Portfolio.query.get(portfolio_id)
+    portfolio = db.session.get(Portfolio, portfolio_id)
     if not portfolio:
         raise ValueError("Portfolio not found.")
     
-    existing = Watchlist.query.filter_by(portfolio_id=portfolio_id, name=name).first()
-    if existing:
+    if Watchlist.query.filter_by(portfolio_id=portfolio_id, name=name).first():
         raise ValueError(f"Watchlist with name '{name}' already exists.")
 
     new_watchlist = Watchlist(name=name, portfolio_id=portfolio_id)
@@ -40,10 +34,8 @@ def create_watchlist(portfolio_id: int, name: str):
     return new_watchlist
 
 def delete_watchlist(watchlist_id: int):
-    """
-    Deletes an entire watchlist and all its associated items.
-    """
-    watchlist = Watchlist.query.get(watchlist_id)
+    """Deletes an entire watchlist and all its associated items."""
+    watchlist = db.session.get(Watchlist, watchlist_id)
     if not watchlist:
         raise ValueError("Watchlist not found.")
     
@@ -53,13 +45,11 @@ def delete_watchlist(watchlist_id: int):
 
 def rename_watchlist(watchlist_id: int, new_name: str):
     """Renames an existing watchlist."""
-    watchlist = Watchlist.query.get(watchlist_id)
+    watchlist = db.session.get(Watchlist, watchlist_id)
     if not watchlist:
         raise ValueError("Watchlist not found.")
     
-    # Check if a watchlist with the new name already exists for this portfolio
-    existing = Watchlist.query.filter_by(portfolio_id=watchlist.portfolio_id, name=new_name).first()
-    if existing and existing.id != watchlist_id:
+    if Watchlist.query.filter(Watchlist.id != watchlist_id, Watchlist.portfolio_id == watchlist.portfolio_id, Watchlist.name == new_name).first():
         raise ValueError(f"A watchlist with the name '{new_name}' already exists.")
 
     watchlist.name = new_name
@@ -67,21 +57,14 @@ def rename_watchlist(watchlist_id: int, new_name: str):
     return watchlist
 
 def add_item_to_watchlist(watchlist_id: int, ticker: str):
-    """
-    Adds a new asset to a watchlist by its ticker symbol.
-    Implements "find-or-create" logic for assets.
-    """
-    watchlist = Watchlist.query.get(watchlist_id)
+    """Adds a new asset to a watchlist using "find-or-create" logic."""
+    watchlist = db.session.get(Watchlist, watchlist_id)
     if not watchlist:
         raise ValueError("Watchlist not found.")
     
-    try:
-        asset = MarketDataService.find_or_create_asset(ticker)
-    except ValueError as e:
-        raise e
+    asset = MarketDataService.find_or_create_asset(ticker)
 
-    existing_item = WatchlistItem.query.filter_by(watchlist_id=watchlist_id, asset_id=asset.id).first()
-    if existing_item:
+    if WatchlistItem.query.filter_by(watchlist_id=watchlist_id, asset_id=asset.id).first():
         raise ValueError(f"Asset '{ticker.upper()}' is already in this watchlist.")
 
     new_item = WatchlistItem(watchlist_id=watchlist_id, asset_id=asset.id)
@@ -91,9 +74,7 @@ def add_item_to_watchlist(watchlist_id: int, ticker: str):
     return new_item
 
 def remove_item_from_watchlist(watchlist_id: int, ticker: str):
-    """
-    Removes an item from a watchlist by its ticker symbol.
-    """
+    """Removes an item from a watchlist by its ticker symbol."""
     ticker = ticker.upper()
     asset = Asset.query.filter_by(ticker_symbol=ticker).first()
     if not asset:

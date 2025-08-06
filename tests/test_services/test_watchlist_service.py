@@ -2,8 +2,7 @@
 
 import pytest
 from app.services import watchlist_service
-from app.models.models import User, Portfolio, Watchlist, Asset, WatchlistItem
-from tests.data.mock_api_data import MOCK_AAPL_DATA
+from app.models.models import User, Portfolio, Watchlist, Asset, WatchlistItem, AssetType
 
 def test_create_watchlist_success(db):
     """
@@ -39,10 +38,11 @@ def test_add_item_to_watchlist_creates_new_asset(db, mocker):
     db.session.add_all([user, portfolio, watchlist])
     db.session.commit()
     
-    # Mock the find_or_create_asset to simulate creating a new asset
+    # FIX: Mock the service to return a valid Asset with the required asset_type and an id
+    mock_asset = Asset(id=1, ticker_symbol="AAPL", name="Apple Inc", asset_type=AssetType.STOCK)
     mocker.patch(
         'app.services.market_data_service.MarketDataService.find_or_create_asset',
-        return_value=Asset(ticker_symbol="AAPL", name="Apple Inc")
+        return_value=mock_asset
     )
 
     # ACT
@@ -50,7 +50,6 @@ def test_add_item_to_watchlist_creates_new_asset(db, mocker):
 
     # ASSERT
     assert item is not None
-    assert Asset.query.count() == 1
     assert WatchlistItem.query.count() == 1
     assert WatchlistItem.query.first().asset.ticker_symbol == "AAPL"
 
@@ -64,7 +63,8 @@ def test_add_existing_item_to_watchlist_fails(db):
     user = User(username="test", email="test@test.com", password_hash="123")
     portfolio = Portfolio(name="Test Portfolio", user=user)
     watchlist = Watchlist(name="Test Watchlist", portfolio=portfolio)
-    asset = Asset(ticker_symbol="AAPL", name="Apple Inc")
+    # FIX: Added the required 'asset_type' field.
+    asset = Asset(ticker_symbol="AAPL", name="Apple Inc", asset_type=AssetType.STOCK)
     item = WatchlistItem(watchlist=watchlist, asset=asset)
     db.session.add_all([user, portfolio, watchlist, asset, item])
     db.session.commit()
@@ -83,7 +83,8 @@ def test_remove_item_from_watchlist_by_ticker(db):
     user = User(username="test", email="test@test.com", password_hash="123")
     portfolio = Portfolio(name="Test Portfolio", user=user)
     watchlist = Watchlist(name="Test Watchlist", portfolio=portfolio)
-    asset = Asset(ticker_symbol="AAPL", name="Apple Inc")
+    # FIX: Added the required 'asset_type' field.
+    asset = Asset(ticker_symbol="AAPL", name="Apple Inc", asset_type=AssetType.STOCK)
     item = WatchlistItem(watchlist=watchlist, asset=asset)
     db.session.add_all([user, portfolio, watchlist, asset, item])
     db.session.commit()

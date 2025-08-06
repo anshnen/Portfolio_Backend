@@ -2,7 +2,7 @@
 
 from decimal import Decimal
 from app.services.portfolio_service import get_portfolio_summary, get_detailed_holdings
-from app.models.models import User, Portfolio, Account, Asset, Holding, Transaction, AccountType, TransactionType
+from app.models.models import User, Portfolio, Account, Asset, Holding, Transaction, AccountType, TransactionType, AssetType
 from datetime import date
 
 def test_get_portfolio_summary_logic(db):
@@ -17,8 +17,9 @@ def test_get_portfolio_summary_logic(db):
     cash = Account(name="Cash", account_type=AccountType.CASH, balance=Decimal("10000"), portfolio=portfolio)
     brokerage = Account(name="Brokerage", account_type=AccountType.INVESTMENT, portfolio=portfolio)
     
-    aapl = Asset(ticker_symbol="AAPL", name="Apple", last_price=Decimal("175"), previous_close_price=Decimal("170"), sector="Tech")
-    msft = Asset(ticker_symbol="MSFT", name="Microsoft", last_price=Decimal("300"), previous_close_price=Decimal("310"), sector="Tech")
+    # FIX: Added the required 'asset_type' field to each Asset.
+    aapl = Asset(ticker_symbol="AAPL", name="Apple", asset_type=AssetType.STOCK, last_price=Decimal("175"), previous_close_price=Decimal("170"), sector="Tech")
+    msft = Asset(ticker_symbol="MSFT", name="Microsoft", asset_type=AssetType.STOCK, last_price=Decimal("300"), previous_close_price=Decimal("310"), sector="Tech")
 
     h_aapl = Holding(account=brokerage, asset=aapl, quantity=10, cost_basis=1500) # Market Value = 1750
     h_msft = Holding(account=brokerage, asset=msft, quantity=5, cost_basis=1600)  # Market Value = 1500
@@ -57,7 +58,8 @@ def test_get_detailed_holdings_logic(db):
     user = User(username="test", email="test@test.com", password_hash="123")
     portfolio = Portfolio(name="Test Portfolio", user=user)
     brokerage = Account(name="Brokerage", account_type=AccountType.INVESTMENT, portfolio=portfolio)
-    aapl = Asset(ticker_symbol="AAPL", name="Apple", last_price=Decimal("175"))
+    # FIX: Added the required 'asset_type' field.
+    aapl = Asset(ticker_symbol="AAPL", name="Apple", asset_type=AssetType.STOCK, last_price=Decimal("175"))
     h_aapl = Holding(account=brokerage, asset=aapl, quantity=10, cost_basis=1500)
     db.session.add_all([user, portfolio, brokerage, aapl, h_aapl])
     db.session.commit()

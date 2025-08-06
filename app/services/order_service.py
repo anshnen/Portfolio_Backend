@@ -1,6 +1,6 @@
 # app/services/order_service.py
 
-from app.models.models import db, Account, Asset, Holding, Transaction
+from app.models.models import db, Account, Asset, Holding, Transaction, TransactionType, TransactionStatus
 from .market_data_service import MarketDataService
 from decimal import Decimal
 from datetime import date
@@ -20,11 +20,13 @@ class OrderService:
         if order_type not in ['MARKET', 'LIMIT', 'STOP_LOSS']:
             raise ValueError("Invalid order_type. Must be 'MARKET', 'LIMIT', or 'STOP_LOSS'.")
         
-        transaction_type = order_data['transaction_type'].upper()
-        if transaction_type not in ['BUY', 'SELL']:
+        transaction_type_str = order_data['transaction_type'].upper()
+        if transaction_type_str not in ['BUY', 'SELL']:
             raise ValueError("Invalid transaction_type. Must be 'BUY' or 'SELL'.")
+        # FIX: Convert the string from the API into a TransactionType enum member
+        transaction_type = TransactionType[transaction_type_str]
 
-        account = Account.query.get(order_data['account_id'])
+        account = db.session.get(Account, order_data['account_id'])
         if not account: raise ValueError("Account not found.")
 
         quantity = Decimal(str(order_data['quantity']))
@@ -33,7 +35,8 @@ class OrderService:
         asset = MarketDataService.find_or_create_asset(order_data['ticker'])
         current_price = asset.last_price
         if not current_price or current_price <= 0:
-            raise ValueError(f"Could not retrieve a valid market price for {asset.ticker_symbol}.{asset}")
+            # FIX: Removed stray object from the error message for clarity.
+            raise ValueError(f"Could not retrieve a valid market price for {asset.ticker_symbol}.")
 
         # --- 2. Handle Pending Orders (LIMIT, STOP_LOSS) ---
         if order_type in ['LIMIT', 'STOP_LOSS']:
@@ -41,13 +44,12 @@ class OrderService:
             if trigger_price <= 0:
                 raise ValueError("A valid trigger_price is required for LIMIT and STOP_LOSS orders.")
             
-            # For now, we just log these as PENDING. A background worker would execute them.
             pending_order = Transaction(
                 account_id=account.id, asset_id=asset.id, transaction_type=transaction_type,
-                status='PENDING', order_type=order_type, trigger_price=trigger_price,
+                status=TransactionStatus.PENDING, order_type=order_type, trigger_price=trigger_price,
                 transaction_date=date.today(), quantity=quantity,
                 total_amount=-(quantity * trigger_price), # Estimated amount
-                description=f"Pending {order_type} {transaction_type} for {quantity} shares of {asset.ticker_symbol} at ${trigger_price}"
+                description=f"Pending {order_type} {transaction_type.value} for {quantity} shares of {asset.ticker_symbol} at ${trigger_price}"
             )
             db.session.add(pending_order)
             db.session.commit()
@@ -58,11 +60,11 @@ class OrderService:
         
         transaction = Transaction(
             account_id=account.id, asset_id=asset.id, transaction_type=transaction_type,
-            status='COMPLETED', order_type='MARKET', transaction_date=date.today(),
+            status=TransactionStatus.COMPLETED, order_type='MARKET', transaction_date=date.today(),
             quantity=quantity, price_per_unit=current_price, commission_fee=OrderService.BROKERAGE_FEE
         )
 
-        if transaction_type == 'BUY':
+        if transaction_type == TransactionType.BUY:
             if account.balance < (total_value + OrderService.BROKERAGE_FEE):
                 raise ValueError("Insufficient funds.")
             
@@ -76,7 +78,7 @@ class OrderService:
             account.balance -= (total_value + OrderService.BROKERAGE_FEE)
             transaction.total_amount = -(total_value)
 
-        elif transaction_type == 'SELL':
+        elif transaction_type == TransactionType.SELL:
             holding = Holding.query.filter_by(account_id=account.id, asset_id=asset.id).first()
             if not holding or holding.quantity < quantity:
                 raise ValueError("Insufficient shares to sell.")

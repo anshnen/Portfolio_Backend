@@ -2,22 +2,23 @@
 
 from datetime import datetime
 from decimal import Decimal
-from app.models.models import db, Account, Asset, Holding, Transaction
+from app.models.models import db, Account, Transaction, TransactionType
 
 def add_transaction(data: dict):
     """
-    Core business logic to add a new transaction.
-    Note: This is a simplified version. For BUY/SELL, the OrderService should be used.
+    Core business logic to add a new transaction (for non-trade events).
     """
     required_fields = ['account_id', 'transaction_type', 'total_amount', 'transaction_date']
     if not all(field in data for field in required_fields):
         raise ValueError("Missing required fields for transaction.")
 
-    account = Account.query.get(data['account_id'])
+    account = db.session.get(Account, data['account_id'])
     if not account:
         raise ValueError("Account not found.")
 
-    transaction_type = data['transaction_type'].upper()
+    transaction_type_str = data['transaction_type'].upper()
+    # Convert the incoming string to a TransactionType enum member for data integrity
+    transaction_type = TransactionType[transaction_type_str]
     total_amount = Decimal(str(data['total_amount']))
     
     new_transaction = Transaction(
@@ -43,8 +44,9 @@ def get_transactions_by_account(account_id: int):
     return [
         {
             "id": t.id,
-            "transaction_type": t.transaction_type,
-            "status": t.status,
+            # FIX: Convert enum objects to their string values for JSON serialization
+            "transaction_type": t.transaction_type.value,
+            "status": t.status.value,
             "order_type": t.order_type,
             "transaction_date": t.transaction_date.isoformat(),
             "total_amount": float(t.total_amount),
@@ -60,10 +62,8 @@ def update_transaction(transaction_id: int, data: dict):
     """
     Updates an existing transaction.
     WARNING: Modifying historical financial records is generally discouraged.
-    This function is provided for flexibility but should be used with caution.
-    It does not recalculate balances or holdings based on the change.
     """
-    transaction = Transaction.query.get(transaction_id)
+    transaction = db.session.get(Transaction, transaction_id)
     if not transaction:
         raise ValueError("Transaction not found.")
 
@@ -73,7 +73,5 @@ def update_transaction(transaction_id: int, data: dict):
     if 'transaction_date' in data:
         transaction.transaction_date = datetime.strptime(data['transaction_date'], '%Y-%m-%d').date()
     
-    # Add other updatable fields as needed, but be cautious about changing financial values.
-
     db.session.commit()
     return transaction

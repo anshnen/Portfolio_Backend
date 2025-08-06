@@ -1,5 +1,3 @@
-PyMySQL
-requests
 Flask
 Flask-SQLAlchemy
 Flask-Migrate
@@ -10,9 +8,8 @@ mysql-connector-python
 yfinance
 click
 gunicorn
-nsepython
-alpha-vantage
 pandas
-polygon-api-client
 pytest
 pytest-mock
+twelvedata
+tiingo

@@ -4,7 +4,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 from sqlalchemy import func, case
 from ..models.models import db, Portfolio, Account, Holding, Transaction, AccountType
-from .market_data_service import MarketDataService # Import the service
+from .market_data_service import MarketDataService
 
 def get_detailed_holdings(portfolio_id: int):
     """
@@ -46,7 +46,7 @@ def get_portfolio_summary(portfolio_id: int):
     Calculates a full summary for a given portfolio, including P&L,
     market indices, a detailed holdings breakdown, and other advanced insights.
     """
-    portfolio = Portfolio.query.get(portfolio_id)
+    portfolio = db.session.get(Portfolio, portfolio_id)
     if not portfolio:
         return None, "Portfolio not found"
 

@@ -53,6 +53,7 @@ class Portfolio(db.Model):
     name = db.Column(db.String(100), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     user = relationship('User', back_populates='portfolios')
     accounts = relationship('Account', back_populates='portfolio', cascade="all, delete-orphan")
@@ -67,8 +68,10 @@ class Account(db.Model):
     name = db.Column(db.String(100), nullable=False)
     account_type = db.Column(db.Enum(AccountType), nullable=False)
     institution = db.Column(db.String(100))
-    balance = db.Column(db.Numeric(15, 2), default=0.00)
+    balance = db.Column(db.Numeric(15, 2), default=0.00) # For CASH accounts, this is the total. For others, it's the cash portion.
     portfolio_id = db.Column(db.Integer, db.ForeignKey('portfolios.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     portfolio = relationship('Portfolio', back_populates='accounts')
     holdings = relationship('Holding', back_populates='account', cascade="all, delete-orphan")
@@ -76,6 +79,7 @@ class Account(db.Model):
 
     @property
     def holdings_market_value(self):
+        """Calculates the total market value of all assets held in this account."""
         return sum(holding.market_value for holding in self.holdings)
 
     def __repr__(self):
@@ -125,6 +129,9 @@ class Holding(db.Model):
     cost_basis = db.Column(db.Numeric(15, 2), nullable=False)
     account_id = db.Column(db.Integer, db.ForeignKey('accounts.id'), nullable=False)
     asset_id = db.Column(db.Integer, db.ForeignKey('assets.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
     account = relationship('Account', back_populates='holdings')
     asset = relationship('Asset')
     
@@ -157,6 +164,8 @@ class Transaction(db.Model):
     description = db.Column(db.String(255))
     account_id = db.Column(db.Integer, db.ForeignKey('accounts.id'), nullable=False)
     asset_id = db.Column(db.Integer, db.ForeignKey('assets.id'))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
     account = relationship('Account', back_populates='transactions')
     asset = relationship('Asset')
 
@@ -168,6 +177,9 @@ class Watchlist(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     portfolio_id = db.Column(db.Integer, db.ForeignKey('portfolios.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
     portfolio = relationship('Portfolio', back_populates='watchlists')
     items = relationship('WatchlistItem', back_populates='watchlist', cascade="all, delete-orphan")
 

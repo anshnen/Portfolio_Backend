@@ -25,8 +25,11 @@ def test_get_accounts_for_portfolio_api(client, db):
     assert response.status_code == 200
     assert isinstance(json_data, list)
     assert len(json_data) == 2
-    assert json_data[0]['name'] == 'Cash'
-    assert json_data[1]['name'] == 'Brokerage'
+    
+    # FIX: Make the assertion more robust by not relying on list order.
+    account_names = {acc['name'] for acc in json_data}
+    assert "Cash" in account_names
+    assert "Brokerage" in account_names
 
 def test_manage_funds_deposit_api(client, db):
     """
@@ -52,6 +55,6 @@ def test_manage_funds_deposit_api(client, db):
     assert json_data['message'] == "Deposit successful."
     assert json_data['new_balance'] == 1500.00
     
-    # Verify the change in the database
-    updated_account = Account.query.get(cash_account.id)
+    # Verify the change in the database using the modern SQLAlchemy 2.0 syntax
+    updated_account = db.session.get(Account, cash_account.id)
     assert updated_account.balance == Decimal("1500.00")
