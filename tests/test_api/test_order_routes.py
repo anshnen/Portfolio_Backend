@@ -28,7 +28,7 @@ def test_place_buy_order_api_insufficient_funds(client, db):
     }
 
     # ACT
-    response = client.post('/api/v1/orders', json=order_payload)
+    response = client.post('/api/v1/orders/', json=order_payload)
     json_data = response.get_json()
 
     # ASSERT
@@ -61,7 +61,7 @@ def test_place_buy_order_api_success(client, db):
     }
 
     # ACT
-    response = client.post('/api/v1/orders', json=order_payload)
+    response = client.post('/api/v1/orders/', json=order_payload)
     
     # ASSERT
     assert response.status_code == 201
